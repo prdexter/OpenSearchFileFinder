@@ -1,7 +1,7 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Interactive Directory Tree Picker (with drive & folder checkboxes)
+- Interactive Directory Tree Picker with Tri-State Indeterminate Checkboxes (half-filled parent boxes)
 - Automatic initial checking of configured directories from indexer_config.json
 - Smart extension parsing (pdf, docx, xlsx, txt, md, pptx)
 - Custom sorting (Relevance, Date, Name, Size)
@@ -248,12 +248,36 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             return p ? p.toLowerCase().replace(/\\\\/g, '/').replace(/\/$/, '') : '';
         }
 
-        function isPathSelected(checkPath) {
+        function getCheckboxState(checkPath) {
             const cPath = norm(checkPath);
+            let exactMatch = false;
+            let childMatch = false;
+
             for (const sp of selectedPaths) {
-                if (norm(sp) === cPath) return true;
+                const normSp = norm(sp);
+                if (normSp === cPath) {
+                    exactMatch = true;
+                } else if (normSp.startsWith(cPath + '/')) {
+                    childMatch = true;
+                }
             }
-            return false;
+
+            if (exactMatch) return 'checked';
+            if (childMatch) return 'indeterminate';
+            return 'unchecked';
+        }
+
+        function updateCheckboxVisual(cb, state) {
+            if (state === 'checked') {
+                cb.checked = true;
+                cb.indeterminate = false;
+            } else if (state === 'indeterminate') {
+                cb.checked = false;
+                cb.indeterminate = true;
+            } else {
+                cb.checked = false;
+                cb.indeterminate = false;
+            }
         }
 
         async function loadDriveTree() {
@@ -267,8 +291,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const driveItem = document.createElement('div');
                 driveItem.className = 'tree-item';
 
-                const isChecked = isPathSelected(drive) ? 'checked' : '';
-
                 const toggleSpan = document.createElement('span');
                 toggleSpan.className = 'tree-toggle';
                 toggleSpan.innerText = '▶';
@@ -278,7 +300,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const cb = document.createElement('input');
                 cb.type = 'checkbox';
                 cb.value = drive;
-                if (isChecked) cb.checked = true;
+                updateCheckboxVisual(cb, getCheckboxState(drive));
                 cb.onchange = function() { onCheckboxChange(this); };
 
                 const label = document.createElement('strong');
@@ -314,7 +336,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         for (const sub of subdirs) {
                             const subItem = document.createElement('div');
                             subItem.className = 'tree-item';
-                            const isChecked = isPathSelected(sub.path) ? 'checked' : '';
 
                             const subToggle = document.createElement('span');
                             subToggle.className = 'tree-toggle';
@@ -325,7 +346,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                             const subCb = document.createElement('input');
                             subCb.type = 'checkbox';
                             subCb.value = sub.path;
-                            if (isChecked) subCb.checked = true;
+                            updateCheckboxVisual(subCb, getCheckboxState(sub.path));
                             subCb.onchange = function() { onCheckboxChange(this); };
 
                             const subLabel = document.createElement('span');
@@ -349,6 +370,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         function onCheckboxChange(cb) {
+            cb.indeterminate = false;
             if (cb.checked) {
                 selectedPaths.add(cb.value);
             } else {
