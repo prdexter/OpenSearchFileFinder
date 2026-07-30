@@ -1,8 +1,9 @@
 """
 High-Performance Document Ingestion Pipeline for OpenSearch.
 Includes:
-- Integrated 4 ms Native PIL DOCX & PyMuPDF Page 1 Thumbnail Generator
-- Real-time chunking for live UI counter updates
+- Multi-Threaded Real-Time 20-Doc Batch Flushes with OpenSearch Index Refresh
+- Instant Live UI Counter Updates on http://localhost:8080
+- 4 ms Native PIL DOCX & PyMuPDF Page 1 Thumbnail Generator
 """
 
 import os
@@ -191,16 +192,17 @@ def extract_file_content(file_path: str, max_bytes: int = 1_000_000) -> str:
         except Exception:
             return ""
 
-    elif ext == '.pdf' and pypdf is not None:
+    elif ext == '.pdf':
         try:
-            reader = pypdf.PdfReader(file_path)
+            doc = fitz.open(file_path)
             text_parts = []
-            for i, page in enumerate(reader.pages):
+            for i, page in enumerate(doc):
                 if i >= 50:
                     break
-                text = page.extract_text()
+                text = page.get_text()
                 if text:
                     text_parts.append(text)
+            doc.close()
             return "\n".join(text_parts)[:max_bytes]
         except Exception:
             return ""
@@ -310,26 +312,27 @@ def main():
     batch = []
     total_indexed = 0
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=8) as executor:
         futures = set()
         for file_path in scan_directories(args.dir):
             futures.add(executor.submit(process_single_file, file_path, args.index))
 
-            if len(futures) >= 100:
+            if len(futures) >= 40:
                 completed = set()
                 for fut in as_completed(futures):
                     doc = fut.result()
                     if doc:
                         batch.append(doc)
                     completed.add(fut)
-                    if len(completed) >= 50:
+                    if len(completed) >= 20:
                         break
                 futures -= completed
 
-                if len(batch) >= 100:
+                if len(batch) >= 20:
                     helpers.bulk(client, batch)
+                    client.indices.refresh(index=args.index)
                     total_indexed += len(batch)
-                    print(f"[+] Bulk indexed {total_indexed} documents...")
+                    print(f"[+] Bulk indexed {total_indexed} documents (Real-time update)...")
                     batch = []
 
         # Flush remaining futures
@@ -340,6 +343,7 @@ def main():
 
         if batch:
             helpers.bulk(client, batch)
+            client.indices.refresh(index=args.index)
             total_indexed += len(batch)
 
     elapsed = time.time() - start_time
