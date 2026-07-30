@@ -1,14 +1,11 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Integrated In-Browser PDF.js & HTML5 Document Viewer Modal (No external app required!)
-- High-Speed PyMuPDF Page 1 PDF Document Thumbnail Generator & Cache (/api/thumbnail?path=...)
-- 2-Column Result Cards with Page 1 Thumbnail Previews & Live Preview button ('👁️ Preview')
+- High-Fidelity DOCX & PDF Page 1 Document Thumbnail Generator & Cache (/api/thumbnail?path=...)
+- Mammoth.js & HTML5 In-Browser Live Document Previewer (/api/raw_file?path=...)
+- 300px 2-Column Result Cards with Page 1 Previews on the Right Side
 - Direct Windows Custom URI Protocols (openfile://, openopus://, openexplorer://)
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
-- Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
-- Strict AND matching for multi-word search terms
-- Full Boolean NOT support (e.g. 'quality NOT IUH', 'quality -IUH')
 """
 
 import os
@@ -25,7 +22,8 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 from pathlib import Path
 from opensearchpy import OpenSearch
-import fitz  # PyMuPDF for lightning-fast Page 1 thumbnail generation
+import fitz  # PyMuPDF for PDF thumbnail rendering
+import win32com.client  # Word COM for DOCX Page 1 rendering
 
 OPENSEARCH_HOST = "localhost"
 OPENSEARCH_PORT = 9200
@@ -41,6 +39,7 @@ HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program 
 
 # Global variables to track active background indexer process
 INDEXER_PROCESS = None
+WORD_LOCK = threading.Lock()
 
 if not os.path.exists(THUMB_CACHE_DIR):
     os.makedirs(THUMB_CACHE_DIR, exist_ok=True)
@@ -48,7 +47,7 @@ if not os.path.exists(THUMB_CACHE_DIR):
 
 def get_thumbnail_bytes(file_path):
     """
-    Generates or retrieves Page 1 thumbnail JPEG bytes for PDF/Image files.
+    Generates or retrieves Page 1 thumbnail JPEG bytes for PDF, DOCX, and Image files.
     """
     if not os.path.exists(file_path):
         return None, None
@@ -72,7 +71,7 @@ def get_thumbnail_bytes(file_path):
             doc = fitz.open(file_path)
             if len(doc) > 0:
                 page = doc[0]
-                pix = page.get_pixmap(dpi=200)  # Ultra-high resolution 300px width Page 1 render
+                pix = page.get_pixmap(dpi=200)
                 pix.save(cache_path)
                 doc.close()
                 with open(cache_path, 'rb') as f:
@@ -80,7 +79,37 @@ def get_thumbnail_bytes(file_path):
         except Exception:
             pass
 
-    # 2. Render Image Files Directly
+    # 2. Render DOCX Page 1 Thumbnail via Word COM + PyMuPDF
+    elif ext in ('docx', 'doc'):
+        with WORD_LOCK:
+            temp_pdf = os.path.join(THUMB_CACHE_DIR, f"temp_{file_hash}.pdf")
+            try:
+                word = win32com.client.Dispatch("Word.Application")
+                word.Visible = False
+                doc = word.Documents.Open(os.path.abspath(file_path))
+                doc.SaveAs(temp_pdf, FileFormat=17)  # 17 = wdFormatPDF
+                doc.Close()
+                word.Quit()
+
+                fitz_doc = fitz.open(temp_pdf)
+                if len(fitz_doc) > 0:
+                    pix = fitz_doc[0].get_pixmap(dpi=200)
+                    pix.save(cache_path)
+                fitz_doc.close()
+
+                if os.path.exists(temp_pdf):
+                    os.remove(temp_pdf)
+
+                with open(cache_path, 'rb') as f:
+                    return f.read(), "image/jpeg"
+            except Exception:
+                if os.path.exists(temp_pdf):
+                    try:
+                        os.remove(temp_pdf)
+                    except Exception:
+                        pass
+
+    # 3. Render Image Files Directly
     elif ext in ('jpg', 'jpeg', 'png', 'bmp', 'webp'):
         try:
             with open(file_path, 'rb') as f:
@@ -120,39 +149,6 @@ def load_config():
 def save_config(cfg):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(cfg, f, indent=2)
-
-
-def get_available_drives():
-    drives = []
-    for letter in string.ascii_uppercase:
-        drive_path = f"{letter}:\\"
-        if os.path.exists(drive_path):
-            drives.append(drive_path)
-    return drives
-
-
-def list_subdirectories(parent_path: str):
-    subdirs = []
-    if not parent_path or not os.path.exists(parent_path):
-        return subdirs
-
-    try:
-        with os.scandir(parent_path) as entries:
-            for entry in entries:
-                if entry.is_dir(follow_symlinks=False):
-                    name_lower = entry.name.lower()
-                    if name_lower not in HIDDEN_DIRS and not name_lower.startswith('.'):
-                        subdirs.append({
-                            "name": entry.name,
-                            "path": entry.path
-                        })
-    except PermissionError:
-        pass
-    except Exception:
-        pass
-        
-    subdirs.sort(key=lambda x: x["name"].lower())
-    return subdirs
 
 
 def parse_smart_query(user_query: str, sort_by: str = "relevance"):
@@ -259,22 +255,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <title>OpenSearch File Finder & Indexer</title>
+    <!-- Mammoth.js for client-side Word DOCX rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1100px; margin: 0 auto; }
+        .container { max-width: 1150px; margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 15px; }
         .header-title h2 { margin: 0; font-size: 24px; color: #007bff; }
         .header-title p { margin: 4px 0 0 0; color: #6c757d; font-size: 14px; }
         .header-buttons { display: flex; gap: 10px; align-items: center; }
         .count-badge { background-color: #e3f2fd; color: #0d47a1; border: 1px solid #bbdefb; padding: 9px 15px; border-radius: 6px; font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
-        .btn-settings { background-color: #6c757d; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-        .btn-settings:hover { background-color: #5a6268; }
         
-        .btn-index { background-color: #28a745; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: background-color 0.3s; }
-        .btn-index:hover { background-color: #218838; }
-        .btn-index.running { background-color: #dc3545; }
-        .btn-index.running:hover { background-color: #c82333; }
-
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
         input[type="text"] { flex: 1; padding: 14px; font-size: 16px; border: 2px solid #ced4da; border-radius: 6px; }
         select { padding: 14px; font-size: 15px; border: 2px solid #ced4da; border-radius: 6px; background: white; cursor: pointer; }
@@ -284,9 +275,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .stats-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .stats { color: #6c757d; font-weight: 500; }
         .toast-notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 14px 28px; border-radius: 6px; font-size: 15px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; z-index: 2000; }
-        .index-badge { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; }
 
-        /* 2-Column Result Card Layout */
+        /* 2-Column Result Card Layout with 300px Right Column Preview */
         .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; gap: 20px; align-items: flex-start; }
         .card-left { flex: 1; min-width: 0; }
         .card-right { flex-shrink: 0; width: 300px; }
@@ -321,13 +311,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .viewer-box { background: white; width: 92%; height: 92%; border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .viewer-header { background: #343a40; color: white; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
         .viewer-header span { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%; }
-        .viewer-body { flex: 1; border: none; width: 100%; height: 100%; background: #f8f9fa; }
+        .viewer-body { flex: 1; border: none; width: 100%; height: 100%; background: #f8f9fa; overflow: auto; padding: 25px; box-sizing: border-box; }
         .viewer-close { cursor: pointer; font-size: 24px; color: #adb5bd; }
         .viewer-close:hover { color: white; }
-
-        /* Lightbox Image Preview */
-        .lightbox-modal { display: none; position: fixed; z-index: 3500; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); align-items: center; justify-content: center; }
-        .lightbox-content { max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 5px 25px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
@@ -339,8 +325,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             <div class="header-buttons">
                 <div class="count-badge" id="docCountBadge">📊 Total Indexed: ...</div>
-                <button type="button" class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
-                <button type="button" class="btn-index" id="indexBtn" onclick="toggleIndexing()">⚡ Start Indexing</button>
             </div>
         </div>
 
@@ -358,7 +342,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         <div class="stats-bar">
             <div class="stats">{STATS}</div>
-            <div class="index-badge" id="indexStatusBadge">⏳ Indexing active in background...</div>
         </div>
 
         {RESULTS}
@@ -373,18 +356,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <span id="viewerTitle">📄 Document Viewer</span>
                 <span class="viewer-close" onclick="closeDocViewer()">&times;</span>
             </div>
-            <iframe class="viewer-body" id="viewerFrame" src="about:blank"></iframe>
+            <div class="viewer-body" id="viewerContainer"></div>
         </div>
     </div>
 
-    <div class="lightbox-modal" id="lightboxModal" onclick="closeLightbox()">
-        <img class="lightbox-content" id="lightboxImg">
-    </div>
-
     <script>
-        let selectedPaths = new Set();
-        let isIndexing = false;
-
         document.addEventListener('DOMContentLoaded', function() {
             checkStatus();
             setInterval(checkStatus, 3000);
@@ -398,30 +374,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             setTimeout(() => { toast.style.display = 'none'; }, 4000);
         }
 
-        function openDocViewer(filePath, title) {
+        async function openDocViewer(filePath, title, ftype) {
             const modal = document.getElementById('docViewerModal');
-            const frame = document.getElementById('viewerFrame');
+            const container = document.getElementById('viewerContainer');
             const titleElem = document.getElementById('viewerTitle');
 
-            titleElem.innerText = '📄 Previewing: ' + title;
-            frame.src = '/api/raw_file?path=' + encodeURIComponent(filePath);
+            titleElem.innerText = '📄 Live Preview: ' + title;
+            container.innerHTML = '<div style="text-align:center; padding:40px; font-size:18px; color:#6c757d;">⏳ Loading document preview...</div>';
             modal.style.display = 'flex';
+
+            const rawUrl = '/api/raw_file?path=' + encodeURIComponent(filePath);
+
+            if (ftype === 'pdf') {
+                container.innerHTML = '<iframe src="' + rawUrl + '" style="width:100%; height:100%; border:none;"></iframe>';
+            } else if (ftype === 'docx' || ftype === 'doc') {
+                try {
+                    const response = await fetch(rawUrl);
+                    const arrayBuffer = await response.arrayBuffer();
+                    if (window.mammoth) {
+                        const result = await mammoth.convertToHtml({arrayBuffer: arrayBuffer});
+                        container.innerHTML = '<div style="max-width:850px; margin:0 auto; background:white; padding:40px; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,0.1); line-height:1.6; font-size:16px;">' + result.value + '</div>';
+                    } else {
+                        container.innerHTML = '<div style="color:red;">Mammoth.js not loaded</div>';
+                    }
+                } catch (e) {
+                    container.innerHTML = '<div style="color:red; padding:20px;">Error rendering DOCX document: ' + e + '</div>';
+                }
+            } else {
+                container.innerHTML = '<iframe src="' + rawUrl + '" style="width:100%; height:100%; border:none;"></iframe>';
+            }
         }
 
         function closeDocViewer() {
             document.getElementById('docViewerModal').style.display = 'none';
-            document.getElementById('viewerFrame').src = 'about:blank';
-        }
-
-        function openLightbox(src) {
-            const modal = document.getElementById('lightboxModal');
-            const img = document.getElementById('lightboxImg');
-            img.src = src;
-            modal.style.display = 'flex';
-        }
-
-        function closeLightbox() {
-            document.getElementById('lightboxModal').style.display = 'none';
+            document.getElementById('viewerContainer').innerHTML = '';
         }
 
         async function handleOpenFile(filePath, customUrl) {
@@ -452,51 +438,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             try {
                 const res = await fetch('/api/status');
                 const data = await res.json();
-                const btn = document.getElementById('indexBtn');
-                const badge = document.getElementById('indexStatusBadge');
                 const countBadge = document.getElementById('docCountBadge');
-
-                isIndexing = data.indexing_running;
                 if (data.total_docs !== undefined) {
                     countBadge.innerText = '📊 Total Indexed: ' + data.total_docs.toLocaleString() + ' docs';
                 }
-
-                if (isIndexing) {
-                    btn.className = 'btn-index running';
-                    btn.innerText = '⏹️ Stop Indexing';
-                    badge.style.display = 'block';
-                } else {
-                    btn.className = 'btn-index';
-                    btn.innerText = '⚡ Start Indexing';
-                    badge.style.display = 'none';
-                }
             } catch (e) {}
-        }
-
-        async function toggleIndexing() {
-            const btn = document.getElementById('indexBtn');
-            const badge = document.getElementById('indexStatusBadge');
-
-            if (isIndexing) {
-                btn.innerText = '⏳ Stopping...';
-                await fetch('/api/stop_indexing', { method: 'POST' });
-                checkStatus();
-            } else {
-                btn.className = 'btn-index running';
-                btn.innerText = '⏹️ Stop Indexing';
-                badge.style.display = 'block';
-
-                const cfgRes = await fetch('/api/config');
-                const cfg = await cfgRes.json();
-                const arr = cfg.selected_directories || [];
-
-                await fetch('/api/config', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({selected_directories: arr})
-                });
-                checkStatus();
-            }
         }
     </script>
 </body>
@@ -516,6 +462,8 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 ext = os.path.splitext(file_path)[1].lower().lstrip('.')
                 content_types = {
                     'pdf': 'application/pdf',
+                    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'doc': 'application/msword',
                     'txt': 'text/plain; charset=utf-8',
                     'html': 'text/html; charset=utf-8',
                     'png': 'image/png',
@@ -581,11 +529,9 @@ class SearchHandler(SimpleHTTPRequestHandler):
                     norm_path = os.path.normpath(file_path)
                     
                     if force_explorer:
-                        # Direct Windows Explorer launch with file selected
                         subprocess.Popen(['explorer', '/select,', norm_path])
                         self.send_json({"status": "ok", "message": "Folder opened in Windows Explorer"})
                     else:
-                        # Try Directory Opus first
                         if os.path.exists(DOPUS_RT):
                             subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "NEW", "SELECT"])
                         elif os.path.exists(DOPUS_EXE):
@@ -668,11 +614,11 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         else:
                             snippet_text = (src.get('content', '')[:300] + "...") if src.get('content') else "No preview text available."
 
-                        # Render Right Column Thumbnail (Page 1 preview for PDF / Image)
-                        if ftype in ('pdf', 'jpg', 'jpeg', 'png', 'bmp', 'webp'):
+                        # Render Right Column Thumbnail (Page 1 preview for PDF, DOCX, and Image)
+                        if ftype in ('pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png', 'bmp', 'webp'):
                             thumb_html = f"""
                             <div class="card-right">
-                                <img src="{thumb_url}" class="thumb-preview" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}')" title="Click to open live full document previewer" alt="Page 1 Preview">
+                                <img src="{thumb_url}" class="thumb-preview" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}', '{ftype}')" title="Click to view live full document preview" alt="Page 1 Preview">
                             </div>
                             """
                         else:
@@ -686,9 +632,9 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         <div class="result-card">
                             <div class="card-left">
                                 <div class="result-header">
-                                    <a class="file-title" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}')" title="Click to view live full document preview in browser">{fname}</a>
+                                    <a class="file-title" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}', '{ftype}')" title="Click to view live full document preview in browser">{fname}</a>
                                     <div class="card-actions">
-                                        <button type="button" class="btn-action btn-preview" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}')">👁️ Preview</button>
+                                        <button type="button" class="btn-action btn-preview" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}', '{ftype}')">👁️ Preview</button>
                                         <button type="button" class="btn-action btn-open-file" onclick="handleOpenFile('{escaped_js_path}', '{open_file_url}')">↗️ Open File</button>
                                         <button type="button" class="btn-action btn-open-explorer" onclick="handleOpenExplorer('{escaped_js_path}', '{open_explorer_url}')">📁 Explorer</button>
                                         <button type="button" class="btn-action btn-open-folder" onclick="handleOpenFolder('{escaped_js_path}', '{open_opus_url}')">📁 Opus</button>
@@ -714,25 +660,6 @@ class SearchHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
         self.wfile.write(html_out.encode('utf-8'))
-
-    def do_POST(self):
-        global INDEXER_PROCESS
-        parsed = urlparse(self.path)
-
-        # API: Stop Indexing
-        if parsed.path == '/api/stop_indexing':
-            if INDEXER_PROCESS and INDEXER_PROCESS.poll() is None:
-                try:
-                    INDEXER_PROCESS.terminate()
-                    INDEXER_PROCESS.wait(timeout=2)
-                except Exception:
-                    try:
-                        INDEXER_PROCESS.kill()
-                    except Exception:
-                        pass
-            INDEXER_PROCESS = None
-            self.send_json({"status": "ok", "message": "Indexing stopped."})
-            return
 
     def send_json(self, data, status=200):
         self.send_response(status)
