@@ -1,7 +1,6 @@
 """
 High-Performance Document Ingestion Pipeline for OpenSearch.
-Supports strict document mode (PDF, Word, Excel, Text, Markdown, PowerPoint)
-with clean file_type field (pdf, docx, xlsx, txt) for 1-word search filtering.
+Flushes bulk batches in real-time chunks of 100 documents for live UI counter updates.
 """
 
 import os
@@ -15,10 +14,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from opensearchpy import OpenSearch, helpers
-try:
-    from tqdm import tqdm
-except ImportError:
-    tqdm = None
 
 # Optional text extraction imports
 try:
@@ -44,7 +39,7 @@ DEFAULT_EXCLUDE_DIRS = {
     '.dropbox.cache', 'dropboxbackup', '.cache', 'appdata'
 }
 
-# File extensions to strictly SKIP (Binaries, DLLs, Shortcuts, System caches, CSVs, Data files)
+# File extensions to strictly SKIP
 SKIP_EXTENSIONS = {
     '.dll', '.exe', '.sys', '.bin', '.so', '.dylib', '.pyc', '.class',
     '.zip', '.tar', '.gz', '.7z', '.rar', '.iso', '.obj', '.o', '.lib',
@@ -75,7 +70,6 @@ def get_opensearch_client(host="localhost", port=9200):
 
 def ensure_index_exists(client, index_name="documents", settings_path="index_settings.json"):
     if client.indices.exists(index=index_name):
-        print(f"[+] Index '{index_name}' already exists.")
         return
 
     print(f"[*] Creating index '{index_name}' with custom settings...")
@@ -100,17 +94,14 @@ def ensure_index_exists(client, index_name="documents", settings_path="index_set
         }
     
     client.indices.create(index=index_name, body=index_body)
-    print(f"[+] Index '{index_name}' successfully created.")
 
 
 def extract_file_content(file_path: str, max_bytes: int = 1_000_000) -> str:
-    """Extracts text content from document formats safely (capped at 1MB per file)."""
     ext = os.path.splitext(file_path)[1].lower()
     
     if ext in SKIP_EXTENSIONS or not ext:
         return ""
         
-    # Text & Markdown files
     if ext in ['.txt', '.md', '.rtf']:
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -118,7 +109,6 @@ def extract_file_content(file_path: str, max_bytes: int = 1_000_000) -> str:
         except Exception:
             return ""
 
-    # PDF files
     elif ext == '.pdf' and pypdf is not None:
         try:
             reader = pypdf.PdfReader(file_path)
@@ -133,7 +123,6 @@ def extract_file_content(file_path: str, max_bytes: int = 1_000_000) -> str:
         except Exception:
             return ""
 
-    # Word files
     elif ext in ['.docx', '.doc'] and docx is not None:
         try:
             doc = docx.Document(file_path)
@@ -141,7 +130,6 @@ def extract_file_content(file_path: str, max_bytes: int = 1_000_000) -> str:
         except Exception:
             return ""
 
-    # Excel files
     elif ext in ['.xlsx', '.xls'] and openpyxl is not None:
         try:
             wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
@@ -161,7 +149,6 @@ def extract_file_content(file_path: str, max_bytes: int = 1_000_000) -> str:
 
 
 def process_single_file(file_path: str, index_name: str) -> dict:
-    """Parses metadata and content for a single document file."""
     file_name = os.path.basename(file_path)
     ext = os.path.splitext(file_name)[1].lower()
     
@@ -173,7 +160,7 @@ def process_single_file(file_path: str, index_name: str) -> dict:
         doc_id = hashlib.sha256(file_path.encode('utf-8')).hexdigest()
         
         file_dir = os.path.dirname(file_path)
-        file_type = ext.lstrip('.').lower() # 'pdf', 'docx', 'xlsx', 'txt', 'md'
+        file_type = ext.lstrip('.').lower()
         content = extract_file_content(file_path)
         
         doc = {
@@ -196,7 +183,6 @@ def process_single_file(file_path: str, index_name: str) -> dict:
 
 
 def is_excluded_dir(dir_path: str) -> bool:
-    """Checks if a directory path should be skipped."""
     norm_path = dir_path.lower()
     for excl in DEFAULT_EXCLUDE_DIRS:
         if excl in norm_path or norm_path.startswith(excl):
@@ -205,10 +191,8 @@ def is_excluded_dir(dir_path: str) -> bool:
 
 
 def scan_directories(target_dirs: list):
-    """Recursively yields file paths from multiple target directories."""
     for target_dir in target_dirs:
         if not os.path.exists(target_dir):
-            print(f"[!] Warning: Directory '{target_dir}' does not exist. Skipping.")
             continue
             
         print(f"[*] Scanning target: {target_dir}")
@@ -224,7 +208,7 @@ def scan_directories(target_dirs: list):
                     yield os.path.join(root, f)
 
 
-def bulk_ingest(client, target_dirs: list, index_name="documents", batch_size=2000, num_threads=8):
+def bulk_ingest(client, target_dirs: list, index_name="documents", batch_size=100, num_threads=8):
     file_generator = scan_directories(target_dirs)
     
     actions_buffer = []
@@ -233,9 +217,6 @@ def bulk_ingest(client, target_dirs: list, index_name="documents", batch_size=20
     start_time = time.time()
 
     executor = ThreadPoolExecutor(max_workers=num_threads)
-    
-    print(f"[*] Starting ingestion pipeline using {num_threads} worker threads...")
-    
     pending_futures = []
     
     try:
@@ -259,14 +240,14 @@ def bulk_ingest(client, target_dirs: list, index_name="documents", batch_size=20
                     if errors:
                         total_failed += len(errors)
                     actions_buffer = []
-                    
-                    elapsed = time.time() - start_time
-                    rate = total_indexed / elapsed if elapsed > 0 else 0
-                    print(f"[Progress] Indexed: {total_indexed:,} docs | Failed/Skipped: {total_failed:,} | Speed: {rate:.1f} docs/sec")
+                    # Force refresh index so live count updates immediately in UI
+                    try:
+                        client.indices.refresh(index=index_name)
+                    except Exception:
+                        pass
     except Exception as e:
         print(f"[!] Error during directory scan: {e}")
 
-    # Flush remaining futures
     if pending_futures:
         for fut in as_completed(pending_futures):
             res = fut.result()
@@ -280,19 +261,12 @@ def bulk_ingest(client, target_dirs: list, index_name="documents", batch_size=20
         total_indexed += success_count
         if errors:
             total_failed += len(errors)
+        try:
+            client.indices.refresh(index=index_name)
+        except Exception:
+            pass
 
     executor.shutdown(wait=True)
-    total_time = time.time() - start_time
-    avg_rate = total_indexed / total_time if total_time > 0 else 0
-    
-    print("\n" + "="*50)
-    print("INGESTION SUMMARY")
-    print("="*50)
-    print(f"Total Successfully Indexed: {total_indexed:,} documents")
-    print(f"Total Failed/Skipped:       {total_failed:,} documents")
-    print(f"Total Execution Time:        {total_time:.2f} seconds ({total_time/60:.2f} minutes)")
-    print(f"Average Throughput:          {avg_rate:.1f} docs/sec")
-    print("="*50)
 
 
 def main():
@@ -300,25 +274,15 @@ def main():
     parser.add_argument("--dir", nargs="+", help="One or more directory paths to scan and index")
     parser.add_argument("--index", type=str, default="documents", help="OpenSearch index name (default: documents)")
     parser.add_argument("--threads", type=int, default=8, help="Number of worker threads (default: 8)")
-    parser.add_argument("--batch", type=int, default=2000, help="Batch size for bulk indexing (default: 2000)")
+    parser.add_argument("--batch", type=int, default=100, help="Batch size for bulk indexing (default: 100)")
     
     args = parser.parse_args()
-    
     client = get_opensearch_client()
-    
-    try:
-        info = client.info()
-        print(f"[+] Connected to OpenSearch cluster: {info.get('cluster_name')} (v{info.get('version', {}).get('number')})")
-    except Exception as e:
-        print(f"[!] Failed to connect to OpenSearch at http://localhost:9200. Is Docker container running?")
-        print(f"    Error details: {e}")
-        sys.exit(1)
-        
     ensure_index_exists(client, index_name=args.index)
+    
     target_dirs = args.dir
     if not target_dirs:
-        user_input = input("Enter directory path(s) to index (space-separated, e.g. C:\\Users D:\\): ").strip()
-        target_dirs = user_input.split()
+        return
         
     bulk_ingest(client, target_dirs=target_dirs, index_name=args.index, batch_size=args.batch, num_threads=args.threads)
 
