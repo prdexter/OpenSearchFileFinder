@@ -1,18 +1,18 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Strict AND matching for multi-word search terms (e.g. 'pdf quality disparities' -> PDF AND quality AND disparities)
-- Full Boolean NOT support (e.g. 'quality NOT IUH', 'quality -IUH', 'quality NOT(IUH)')
-- Direct '⚡ Start Indexing' trigger button in the main header
+- Dynamic Live Indexing Status Button ('⏳ Indexing in Progress...' vs '⚡ Start Indexing')
+- Automatic background process status polling via /api/status
+- Strict AND matching for multi-word search terms
+- Full Boolean NOT support (e.g. 'quality NOT IUH', 'quality -IUH')
 - Interactive Directory Tree Picker with Tri-State Indeterminate Checkboxes
-- Smart extension parsing (pdf, docx, xlsx, txt, md, pptx)
-- Custom sorting (Relevance, Date, Name, Size)
 """
 
 import os
 import re
 import json
 import string
+import sys
 import threading
 import subprocess
 from http.server import HTTPServer, SimpleHTTPRequestHandler
@@ -27,6 +27,9 @@ KNOWN_EXTENSIONS = {'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'csv', 'md', 'rt
 
 # System folders to hide from folder tree picker
 HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata', 'appdata'}
+
+# Global variable to track active background indexer thread
+IS_INDEXING_RUNNING = False
 
 
 def get_client():
@@ -82,16 +85,7 @@ def list_subdirectories(parent_path: str):
 
 
 def parse_smart_query(user_query: str, sort_by: str = "relevance"):
-    """
-    Parses plain search queries with support for:
-    - Strict AND matching for space-separated words (e.g. 'quality disparities' -> quality AND disparities)
-    - File extensions (pdf, docx, xlsx, md)
-    - Boolean NOT operators ('NOT IUH', '-IUH', 'NOT(IUH)')
-    - Explicit OR operators ('quality OR disparities')
-    """
     raw_query = user_query.strip()
-    
-    # Normalize NOT(term) syntax to ' NOT term '
     raw_query = re.sub(r'NOT\s*\(\s*([^)]+)\s*\)', r' NOT \1 ', raw_query, flags=re.IGNORECASE)
     
     tokens = raw_query.split()
@@ -110,7 +104,6 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance"):
         if token_upper in ('AND', 'OR'):
             continue
 
-        # Handle NOT term syntax (e.g. 'NOT IUH')
         if token_upper == 'NOT' or token_upper == 'AND NOT':
             if i + 1 < len(tokens):
                 not_val = tokens[i + 1].strip('()')
@@ -119,7 +112,6 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance"):
                 skip_next = True
             continue
 
-        # Handle -term syntax (e.g. '-IUH')
         if token.startswith('-') and len(token) > 1:
             must_not_terms.append(token[1:].strip('()'))
             continue
@@ -137,7 +129,6 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance"):
         must_conditions.append({"terms": {"file_type": file_types}})
         
     if must_terms:
-        # Enforce strict AND matching across all search terms
         for term in must_terms:
             must_conditions.append({
                 "multi_match": {
@@ -206,8 +197,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .header-buttons { display: flex; gap: 10px; align-items: center; }
         .btn-settings { background-color: #6c757d; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
         .btn-settings:hover { background-color: #5a6268; }
-        .btn-index { background-color: #28a745; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        
+        .btn-index { background-color: #28a745; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: background-color 0.3s; }
         .btn-index:hover { background-color: #218838; }
+        .btn-index.running { background-color: #ff9800; cursor: default; }
 
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
         input[type="text"] { flex: 1; padding: 14px; font-size: 16px; border: 2px solid #ced4da; border-radius: 6px; }
@@ -217,7 +210,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .stats-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .stats { color: #6c757d; font-weight: 500; }
-        .index-badge { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; }
+        .index-badge { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; }
 
         .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .result-header { display: flex; justify-content: space-between; align-items: center; }
@@ -252,11 +245,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="header">
             <div class="header-title">
                 <h2>🔍 OpenSearch File Finder</h2>
-                <p>Type extension names (e.g. <code>pdf</code>, <code>docx</code>, <code>xlsx</code>, <code>md</code>) and exclusion terms (e.g. <code>quality NOT IUH</code> or <code>quality -IUH</code>) directly into the search bar!</p>
+                <p>Type extension names (e.g. <code>pdf</code>, <code>docx</code>, <code>xlsx</code>, <code>md</code>) and exclusion terms (e.g. <code>quality NOT IUH</code>) directly into the search bar!</p>
             </div>
             <div class="header-buttons">
                 <button class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
-                <button class="btn-index" onclick="triggerIndexing()">⚡ Start Indexing</button>
+                <button class="btn-index" id="indexBtn" onclick="triggerIndexing()">⚡ Start Indexing</button>
             </div>
         </div>
 
@@ -274,7 +267,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         <div class="stats-bar">
             <div class="stats">{STATS}</div>
-            <div class="index-badge" id="indexStatusBadge">⚡ Indexing active in background...</div>
+            <div class="index-badge" id="indexStatusBadge">⏳ Indexing active in background...</div>
         </div>
 
         {RESULTS}
@@ -300,6 +293,31 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <script>
         let selectedPaths = new Set();
+
+        // Check indexer status on page load and poll every 3 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            checkStatus();
+            setInterval(checkStatus, 3000);
+        });
+
+        async function checkStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                const btn = document.getElementById('indexBtn');
+                const badge = document.getElementById('indexStatusBadge');
+
+                if (data.indexing_running) {
+                    btn.className = 'btn-index running';
+                    btn.innerText = '⏳ Indexing in Progress...';
+                    badge.style.display = 'block';
+                } else {
+                    btn.className = 'btn-index';
+                    btn.innerText = '⚡ Start Indexing';
+                    badge.style.display = 'none';
+                }
+            } catch (e) {}
+        }
 
         async function openTreeModal() {
             document.getElementById('treeModal').style.display = 'block';
@@ -459,17 +477,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             });
 
             statusMsg.innerText = '✓ Indexer triggered in background!';
-            showIndexBadge();
             setTimeout(() => {
                 closeTreeModal();
                 statusMsg.innerText = '';
+                checkStatus();
             }, 1500);
         }
 
         async function triggerIndexing() {
-            const badge = document.getElementById('indexStatusBadge');
-            badge.style.display = 'block';
-            badge.innerText = '⚡ Starting indexer...';
+            const btn = document.getElementById('indexBtn');
+            btn.className = 'btn-index running';
+            btn.innerText = '⏳ Indexing in Progress...';
 
             const cfgRes = await fetch('/api/config');
             const cfg = await cfgRes.json();
@@ -480,17 +498,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({selected_directories: arr})
             });
-
-            badge.innerText = '⚡ Indexing active in background...';
-            setTimeout(() => {
-                badge.style.display = 'none';
-            }, 5000);
-        }
-
-        function showIndexBadge() {
-            const badge = document.getElementById('indexStatusBadge');
-            badge.style.display = 'block';
-            setTimeout(() => { badge.style.display = 'none'; }, 5000);
+            checkStatus();
         }
     </script>
 </body>
@@ -502,6 +510,11 @@ class SearchHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
+
+        # API: Indexing Status
+        if parsed.path == '/api/status':
+            self.send_json({"indexing_running": IS_INDEXING_RUNNING})
+            return
 
         # API: Available Drives
         if parsed.path == '/api/drives':
@@ -593,6 +606,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
         self.wfile.write(html_out.encode('utf-8'))
 
     def do_POST(self):
+        global IS_INDEXING_RUNNING
         parsed = urlparse(self.path)
         if parsed.path == '/api/config':
             content_length = int(self.headers.get('Content-Length', 0))
@@ -601,12 +615,17 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 data = json.loads(body)
                 save_config(data)
 
-                # Trigger ingest_documents.py in background thread
+                # Trigger ingest_documents.py in background thread with status flag
                 dirs = data.get("selected_directories", [])
                 if dirs:
                     def run_ingest():
-                        cmd = [sys.executable, "ingest_documents.py", "--dir"] + dirs
-                        subprocess.run(cmd, cwd=os.path.dirname(__file__))
+                        global IS_INDEXING_RUNNING
+                        IS_INDEXING_RUNNING = True
+                        try:
+                            cmd = [sys.executable, "ingest_documents.py", "--dir"] + dirs
+                            subprocess.run(cmd, cwd=os.path.dirname(__file__))
+                        finally:
+                            IS_INDEXING_RUNNING = False
 
                     t = threading.Thread(target=run_ingest)
                     t.daemon = True
@@ -630,5 +649,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import sys
     main()
