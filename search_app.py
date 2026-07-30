@@ -1,7 +1,8 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Dynamic Live Indexing Status Button ('⏳ Indexing in Progress...' vs '⚡ Start Indexing')
+- Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
+- API endpoint /api/stop_indexing to safely terminate background indexing processes
 - Automatic background process status polling via /api/status
 - Strict AND matching for multi-word search terms
 - Full Boolean NOT support (e.g. 'quality NOT IUH', 'quality -IUH')
@@ -28,7 +29,8 @@ KNOWN_EXTENSIONS = {'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'csv', 'md', 'rt
 # System folders to hide from folder tree picker
 HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata', 'appdata'}
 
-# Global variable to track active background indexer thread
+# Global variables to track active background indexer process
+INDEXER_PROCESS = None
 IS_INDEXING_RUNNING = False
 
 
@@ -200,7 +202,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         
         .btn-index { background-color: #28a745; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: background-color 0.3s; }
         .btn-index:hover { background-color: #218838; }
-        .btn-index.running { background-color: #ff9800; cursor: default; }
+        .btn-index.running { background-color: #dc3545; }
+        .btn-index.running:hover { background-color: #c82333; }
 
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
         input[type="text"] { flex: 1; padding: 14px; font-size: 16px; border: 2px solid #ced4da; border-radius: 6px; }
@@ -249,7 +252,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             <div class="header-buttons">
                 <button class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
-                <button class="btn-index" id="indexBtn" onclick="triggerIndexing()">⚡ Start Indexing</button>
+                <button class="btn-index" id="indexBtn" onclick="toggleIndexing()">⚡ Start Indexing</button>
             </div>
         </div>
 
@@ -293,8 +296,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
     <script>
         let selectedPaths = new Set();
+        let isIndexing = false;
 
-        // Check indexer status on page load and poll every 3 seconds
         document.addEventListener('DOMContentLoaded', function() {
             checkStatus();
             setInterval(checkStatus, 3000);
@@ -307,9 +310,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const btn = document.getElementById('indexBtn');
                 const badge = document.getElementById('indexStatusBadge');
 
-                if (data.indexing_running) {
+                isIndexing = data.indexing_running;
+
+                if (isIndexing) {
                     btn.className = 'btn-index running';
-                    btn.innerText = '⏳ Indexing in Progress...';
+                    btn.innerText = '⏹️ Stop Indexing';
                     badge.style.display = 'block';
                 } else {
                     btn.className = 'btn-index';
@@ -317,6 +322,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     badge.style.display = 'none';
                 }
             } catch (e) {}
+        }
+
+        async function toggleIndexing() {
+            const btn = document.getElementById('indexBtn');
+            const badge = document.getElementById('indexStatusBadge');
+
+            if (isIndexing) {
+                btn.innerText = '⏳ Stopping...';
+                await fetch('/api/stop_indexing', { method: 'POST' });
+                checkStatus();
+            } else {
+                btn.className = 'btn-index running';
+                btn.innerText = '⏹️ Stop Indexing';
+                badge.style.display = 'block';
+
+                const cfgRes = await fetch('/api/config');
+                const cfg = await cfgRes.json();
+                const arr = cfg.selected_directories || [];
+
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({selected_directories: arr})
+                });
+                checkStatus();
+            }
         }
 
         async function openTreeModal() {
@@ -483,23 +514,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 checkStatus();
             }, 1500);
         }
-
-        async function triggerIndexing() {
-            const btn = document.getElementById('indexBtn');
-            btn.className = 'btn-index running';
-            btn.innerText = '⏳ Indexing in Progress...';
-
-            const cfgRes = await fetch('/api/config');
-            const cfg = await cfgRes.json();
-            const arr = cfg.selected_directories || [];
-
-            await fetch('/api/config', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({selected_directories: arr})
-            });
-            checkStatus();
-        }
     </script>
 </body>
 </html>
@@ -606,8 +620,25 @@ class SearchHandler(SimpleHTTPRequestHandler):
         self.wfile.write(html_out.encode('utf-8'))
 
     def do_POST(self):
-        global IS_INDEXING_RUNNING
+        global INDEXER_PROCESS, IS_INDEXING_RUNNING
         parsed = urlparse(self.path)
+
+        # API: Stop Indexing
+        if parsed.path == '/api/stop_indexing':
+            if INDEXER_PROCESS and INDEXER_PROCESS.poll() is None:
+                try:
+                    INDEXER_PROCESS.terminate()
+                    INDEXER_PROCESS.wait(timeout=2)
+                except Exception:
+                    try:
+                        INDEXER_PROCESS.kill()
+                    except Exception:
+                        pass
+            IS_INDEXING_RUNNING = False
+            self.send_json({"status": "ok", "message": "Indexing stopped."})
+            return
+
+        # API: Config and Start Indexing
         if parsed.path == '/api/config':
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length)
@@ -615,17 +646,26 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 data = json.loads(body)
                 save_config(data)
 
-                # Trigger ingest_documents.py in background thread with status flag
+                # Terminate any running instance first
+                if INDEXER_PROCESS and INDEXER_PROCESS.poll() is None:
+                    try:
+                        INDEXER_PROCESS.terminate()
+                    except Exception:
+                        pass
+
+                # Trigger ingest_documents.py as manageable subprocess
                 dirs = data.get("selected_directories", [])
                 if dirs:
                     def run_ingest():
-                        global IS_INDEXING_RUNNING
+                        global INDEXER_PROCESS, IS_INDEXING_RUNNING
                         IS_INDEXING_RUNNING = True
                         try:
                             cmd = [sys.executable, "ingest_documents.py", "--dir"] + dirs
-                            subprocess.run(cmd, cwd=os.path.dirname(__file__))
+                            INDEXER_PROCESS = subprocess.Popen(cmd, cwd=os.path.dirname(__file__))
+                            INDEXER_PROCESS.wait()
                         finally:
                             IS_INDEXING_RUNNING = False
+                            INDEXER_PROCESS = None
 
                     t = threading.Thread(target=run_ingest)
                     t.daemon = True
