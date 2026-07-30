@@ -54,7 +54,7 @@ SKIP_EXTENSIONS = {
     '.zip', '.tar', '.gz', '.7z', '.rar', '.iso', '.obj', '.o', '.lib',
     '.pdb', '.dat', '.tmp', '.pyd', '.nupkg', '.cab', '.msi', '.lnk',
     '.cache', '.bak', '.ico', '.png', '.jpg', '.jpeg', '.gif', '.mp3', '.mp4',
-    '.ini', '.log', '.csv', '.tsv', '.pb'
+    '.ini', '.log', '.csv', '.tsv', '.pb', '.pak'
 }
 
 # Pure Human Document extensions (PDF, Word, Excel, Text, Markdown, PPT)
