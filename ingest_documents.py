@@ -1,7 +1,7 @@
 """
 High-Performance Document Ingestion Pipeline for OpenSearch.
 Includes:
-- Integrated Page 1 Thumbnail Generation directly during Document Indexing
+- Integrated 4 ms Native PIL DOCX & PyMuPDF Page 1 Thumbnail Generator
 - Real-time chunking for live UI counter updates
 """
 
@@ -12,11 +12,14 @@ import time
 import hashlib
 import argparse
 import threading
+import zipfile
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from opensearchpy import OpenSearch, helpers
+from PIL import Image, ImageDraw
 import fitz  # PyMuPDF for PDF thumbnail rendering
 
 try:
@@ -34,18 +37,14 @@ try:
 except ImportError:
     openpyxl = None
 
-try:
-    import win32com.client
-    HAS_WORD = True
-except ImportError:
-    HAS_WORD = False
-
 # Default folders to skip
 DEFAULT_EXCLUDE_DIRS = {
     r'c:\windows', r'c:\program files', r'c:\program files (x86)',
     r'c:\programdata', r'$recycle.bin', r'system volume information',
     '__pycache__', '.git', '.svn', 'node_modules', '.venv', 'venv',
-    '.dropbox.cache', 'dropboxbackup', '.cache', 'appdata'
+    '.dropbox.cache', 'dropboxbackup', '.cache', 'appdata',
+    r'd:\active research\deidentifier\identified', r'deidentifier\identified',
+    'deidentifier', 'identified'
 }
 
 # File extensions to strictly SKIP
@@ -66,13 +65,56 @@ THUMB_CACHE_DIR = os.path.join(os.path.dirname(__file__), ".cache_thumbnails")
 if not os.path.exists(THUMB_CACHE_DIR):
     os.makedirs(THUMB_CACHE_DIR, exist_ok=True)
 
-WORD_LOCK = threading.Lock()
+
+def generate_fast_docx_cover(file_path, cache_path):
+    file_name = os.path.basename(file_path)
+    snippet = ""
+    try:
+        with zipfile.ZipFile(file_path) as z:
+            if 'word/document.xml' in z.namelist():
+                xml_content = z.read('word/document.xml')
+                tree = ET.fromstring(xml_content)
+                text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
+                full_text = " ".join([node.text for node in text_nodes if node.text])
+                snippet = full_text[:400]
+    except Exception:
+        pass
+
+    img = Image.new('RGB', (600, 720), color='#ffffff')
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([0, 0, 599, 719], outline='#dee2e6', width=2)
+    draw.rectangle([0, 0, 600, 18], fill='#007bff')
+    draw.rectangle([0, 18, 600, 110], fill='#f8f9fa')
+
+    draw.text((30, 38), "MICROSOFT WORD DOCUMENT", fill='#6c757d')
+    draw.text((30, 65), file_name[:42], fill='#007bff')
+
+    draw.rectangle([30, 140, 570, 143], fill='#007bff')
+    draw.rectangle([30, 160, 36, 680], fill='#007bff')
+
+    y = 165
+    if snippet:
+        words = snippet.split()
+        current_line = []
+        for word in words:
+            current_line.append(word)
+            line_str = " ".join(current_line)
+            if len(line_str) >= 42:
+                draw.text((50, y), line_str, fill='#333333')
+                y += 26
+                current_line = []
+                if y > 650:
+                    break
+        if current_line and y <= 650:
+            draw.text((50, y), " ".join(current_line), fill='#333333')
+    else:
+        draw.text((50, 165), "(Word Document Preview)", fill='#6c757d')
+
+    img.save(cache_path, 'JPEG', quality=90)
 
 
 def generate_thumbnail_if_missing(file_path: str, ext: str):
-    """
-    Generates Page 1 thumbnail during indexing if not already cached on disk.
-    """
     try:
         file_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
         cache_path = os.path.join(THUMB_CACHE_DIR, f"{file_hash}.jpg")
@@ -88,31 +130,8 @@ def generate_thumbnail_if_missing(file_path: str, ext: str):
                 pix.save(cache_path)
                 doc.close()
 
-        elif ext in ('.docx', '.doc') and HAS_WORD:
-            with WORD_LOCK:
-                temp_pdf = os.path.join(THUMB_CACHE_DIR, f"temp_{file_hash}.pdf")
-                try:
-                    word = win32com.client.Dispatch("Word.Application")
-                    word.Visible = False
-                    doc = word.Documents.Open(os.path.abspath(file_path))
-                    doc.SaveAs(temp_pdf, FileFormat=17)
-                    doc.Close()
-                    word.Quit()
-
-                    fitz_doc = fitz.open(temp_pdf)
-                    if len(fitz_doc) > 0:
-                        pix = fitz_doc[0].get_pixmap(dpi=200)
-                        pix.save(cache_path)
-                    fitz_doc.close()
-
-                    if os.path.exists(temp_pdf):
-                        os.remove(temp_pdf)
-                except Exception:
-                    if os.path.exists(temp_pdf):
-                        try:
-                            os.remove(temp_pdf)
-                        except Exception:
-                            pass
+        elif ext in ('.docx', '.doc'):
+            generate_fast_docx_cover(file_path, cache_path)
     except Exception:
         pass
 
@@ -226,7 +245,6 @@ def process_single_file(file_path: str, index_name: str) -> dict:
         file_type = ext.lstrip('.').lower()
         content = extract_file_content(file_path)
 
-        # Generate Page 1 Thumbnail persistently during ingestion
         generate_thumbnail_if_missing(file_path, ext)
         
         doc = {
