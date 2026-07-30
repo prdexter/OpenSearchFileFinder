@@ -1,8 +1,9 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Lightning-Fast 4 ms Native PIL DOCX Document Cover Thumbnail Generator
-- High-Speed PyMuPDF Page 1 PDF Document Thumbnail Generator & Cache (/api/thumbnail?path=...)
+- Restored Header Controls ('📁 Index Directories' and '⚡ Start Indexing' buttons)
+- Interactive Directory Tree Picker with Tri-State Indeterminate Checkboxes
+- 4 ms Native PIL DOCX & PyMuPDF Page 1 Document Thumbnail Generator & Cache (/api/thumbnail?path=...)
 - Mammoth.js & HTML5 In-Browser Live Document Previewer (/api/raw_file?path=...)
 - 300px 2-Column Result Cards with Page 1 Previews on the Right Side
 - Direct Windows Custom URI Protocols (openfile://, openopus://, openexplorer://)
@@ -26,7 +27,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 from pathlib import Path
 from opensearchpy import OpenSearch
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import fitz  # PyMuPDF for PDF thumbnail rendering
 
 OPENSEARCH_HOST = "localhost"
@@ -88,7 +89,6 @@ def generate_fast_docx_cover(file_path, cache_path):
     # Draw text preview snippet
     y = 165
     if snippet:
-        # Wrap snippet text into ~48 char lines
         words = snippet.split()
         current_line = []
         for word in words:
@@ -191,6 +191,39 @@ def load_config():
 def save_config(cfg):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(cfg, f, indent=2)
+
+
+def get_available_drives():
+    drives = []
+    for letter in string.ascii_uppercase:
+        drive_path = f"{letter}:\\"
+        if os.path.exists(drive_path):
+            drives.append(drive_path)
+    return drives
+
+
+def list_subdirectories(parent_path: str):
+    subdirs = []
+    if not parent_path or not os.path.exists(parent_path):
+        return subdirs
+
+    try:
+        with os.scandir(parent_path) as entries:
+            for entry in entries:
+                if entry.is_dir(follow_symlinks=False):
+                    name_lower = entry.name.lower()
+                    if name_lower not in HIDDEN_DIRS and not name_lower.startswith('.'):
+                        subdirs.append({
+                            "name": entry.name,
+                            "path": entry.path
+                        })
+    except PermissionError:
+        pass
+    except Exception:
+        pass
+        
+    subdirs.sort(key=lambda x: x["name"].lower())
+    return subdirs
 
 
 def parse_smart_query(user_query: str, sort_by: str = "relevance"):
@@ -307,6 +340,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .header-title p { margin: 4px 0 0 0; color: #6c757d; font-size: 14px; }
         .header-buttons { display: flex; gap: 10px; align-items: center; }
         .count-badge { background-color: #e3f2fd; color: #0d47a1; border: 1px solid #bbdefb; padding: 9px 15px; border-radius: 6px; font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+        .btn-settings { background-color: #6c757d; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .btn-settings:hover { background-color: #5a6268; }
+        
+        .btn-index { background-color: #28a745; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: background-color 0.3s; }
+        .btn-index:hover { background-color: #218838; }
+        .btn-index.running { background-color: #dc3545; }
+        .btn-index.running:hover { background-color: #c82333; }
         
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
         input[type="text"] { flex: 1; padding: 14px; font-size: 16px; border: 2px solid #ced4da; border-radius: 6px; }
@@ -317,6 +357,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .stats-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .stats { color: #6c757d; font-weight: 500; }
         .toast-notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 14px 28px; border-radius: 6px; font-size: 15px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; z-index: 2000; }
+        .index-badge { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; }
 
         /* 2-Column Result Card Layout with 300px Right Column Preview */
         .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; gap: 20px; align-items: flex-start; }
@@ -356,6 +397,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .viewer-body { flex: 1; border: none; width: 100%; height: 100%; background: #f8f9fa; overflow: auto; padding: 25px; box-sizing: border-box; }
         .viewer-close { cursor: pointer; font-size: 24px; color: #adb5bd; }
         .viewer-close:hover { color: white; }
+
+        /* Modal Styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 40px auto; padding: 25px; border-radius: 8px; width: 650px; max-width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dee2e6; padding-bottom: 12px; margin-bottom: 15px; }
+        .modal-header h3 { margin: 0; }
+        .close { cursor: pointer; font-size: 24px; color: #aaa; }
+        .close:hover { color: #000; }
+
+        .tree-container { flex: 1; overflow-y: auto; border: 1px solid #ced4da; border-radius: 6px; padding: 12px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; background: #fafafa; }
+        .tree-item { margin: 6px 0; }
+        .tree-toggle { cursor: pointer; display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; font-weight: bold; color: #007bff; user-select: none; border-radius: 3px; }
+        .tree-toggle:hover { background-color: #e9ecef; }
+        .tree-children { margin-left: 24px; display: none; }
+        .tree-children.open { display: block; }
+        
+        .modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; border-top: 1px solid #dee2e6; padding-top: 15px; }
+        .btn-save { background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-save:hover { background-color: #218838; }
     </style>
 </head>
 <body>
@@ -367,6 +427,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             <div class="header-buttons">
                 <div class="count-badge" id="docCountBadge">📊 Total Indexed: ...</div>
+                <button type="button" class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
+                <button type="button" class="btn-index" id="indexBtn" onclick="toggleIndexing()">⚡ Start Indexing</button>
             </div>
         </div>
 
@@ -384,6 +446,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         <div class="stats-bar">
             <div class="stats">{STATS}</div>
+            <div class="index-badge" id="indexStatusBadge">⏳ Indexing active in background...</div>
         </div>
 
         {RESULTS}
@@ -402,7 +465,28 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- Directory Tree Picker Modal -->
+    <div id="treeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📁 Select Directories to Index</h3>
+                <span class="close" onclick="closeTreeModal()">&times;</span>
+            </div>
+            <p style="font-size:13px; color:#6c757d; margin-top:0;">Check the folders you want OpenSearch to scan and index across your drives:</p>
+            <div class="tree-container" id="treeContainer">
+                Loading drive and directory tree...
+            </div>
+            <div class="modal-footer">
+                <span id="statusMsg" style="font-size:13px; font-weight:bold; color:#007bff;"></span>
+                <button type="button" class="btn-save" onclick="saveSelectedDirectories()">Save & Start Indexer</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        let selectedPaths = new Set();
+        let isIndexing = false;
+
         document.addEventListener('DOMContentLoaded', function() {
             checkStatus();
             setInterval(checkStatus, 3000);
@@ -480,11 +564,218 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             try {
                 const res = await fetch('/api/status');
                 const data = await res.json();
+                const btn = document.getElementById('indexBtn');
+                const badge = document.getElementById('indexStatusBadge');
                 const countBadge = document.getElementById('docCountBadge');
+
+                isIndexing = data.indexing_running;
                 if (data.total_docs !== undefined) {
                     countBadge.innerText = '📊 Total Indexed: ' + data.total_docs.toLocaleString() + ' docs';
                 }
+
+                if (btn && badge) {
+                    if (isIndexing) {
+                        btn.className = 'btn-index running';
+                        btn.innerText = '⏹️ Stop Indexing';
+                        badge.style.display = 'block';
+                    } else {
+                        btn.className = 'btn-index';
+                        btn.innerText = '⚡ Start Indexing';
+                        badge.style.display = 'none';
+                    }
+                }
             } catch (e) {}
+        }
+
+        async function toggleIndexing() {
+            const btn = document.getElementById('indexBtn');
+            const badge = document.getElementById('indexStatusBadge');
+
+            if (isIndexing) {
+                btn.innerText = '⏳ Stopping...';
+                await fetch('/api/stop_indexing', { method: 'POST' });
+                checkStatus();
+            } else {
+                if (btn) btn.className = 'btn-index running';
+                if (btn) btn.innerText = '⏹️ Stop Indexing';
+                if (badge) badge.style.display = 'block';
+
+                const cfgRes = await fetch('/api/config');
+                const cfg = await cfgRes.json();
+                const arr = cfg.selected_directories || [];
+
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({selected_directories: arr})
+                });
+                checkStatus();
+            }
+        }
+
+        async function openTreeModal() {
+            document.getElementById('treeModal').style.display = 'block';
+            const cfgRes = await fetch('/api/config');
+            const cfg = await cfgRes.json();
+            selectedPaths = new Set(cfg.selected_directories || []);
+            loadDriveTree();
+        }
+
+        function closeTreeModal() {
+            document.getElementById('treeModal').style.display = 'none';
+        }
+
+        function norm(p) {
+            return p ? p.toLowerCase().replace(/\\\\/g, '/').replace(/\/$/, '') : '';
+        }
+
+        function getCheckboxState(checkPath) {
+            const cPath = norm(checkPath);
+            let exactMatch = false;
+            let childMatch = false;
+
+            for (const sp of selectedPaths) {
+                const normSp = norm(sp);
+                if (normSp === cPath) {
+                    exactMatch = true;
+                } else if (normSp.startsWith(cPath + '/')) {
+                    childMatch = true;
+                }
+            }
+
+            if (exactMatch) return 'checked';
+            if (childMatch) return 'indeterminate';
+            return 'unchecked';
+        }
+
+        function updateCheckboxVisual(cb, state) {
+            if (state === 'checked') {
+                cb.checked = true;
+                cb.indeterminate = false;
+            } else if (state === 'indeterminate') {
+                cb.checked = false;
+                cb.indeterminate = true;
+            } else {
+                cb.checked = false;
+                cb.indeterminate = false;
+            }
+        }
+
+        async function loadDriveTree() {
+            const container = document.getElementById('treeContainer');
+            container.innerHTML = '';
+
+            const res = await fetch('/api/drives');
+            const drives = await res.json();
+
+            for (const drive of drives) {
+                const driveItem = document.createElement('div');
+                driveItem.className = 'tree-item';
+
+                const toggleSpan = document.createElement('span');
+                toggleSpan.className = 'tree-toggle';
+                toggleSpan.innerText = '▶';
+                toggleSpan.setAttribute('data-path', drive);
+                toggleSpan.onclick = function() { toggleFolder(this); };
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = drive;
+                updateCheckboxVisual(cb, getCheckboxState(drive));
+                cb.onchange = function() { onCheckboxChange(this); };
+
+                const label = document.createElement('strong');
+                label.innerHTML = ' 💻 ' + drive;
+
+                const childrenDiv = document.createElement('div');
+                childrenDiv.className = 'tree-children';
+
+                driveItem.appendChild(toggleSpan);
+                driveItem.appendChild(cb);
+                driveItem.appendChild(label);
+                driveItem.appendChild(childrenDiv);
+                container.appendChild(driveItem);
+            }
+        }
+
+        async function toggleFolder(element) {
+            const path = element.getAttribute('data-path');
+            const treeItem = element.parentElement;
+            const childrenDiv = treeItem.querySelector('.tree-children');
+
+            if (element.innerText === '▶') {
+                element.innerText = '▼';
+                childrenDiv.classList.add('open');
+
+                if (childrenDiv.children.length === 0) {
+                    const res = await fetch('/api/ls?path=' + encodeURIComponent(path));
+                    const subdirs = await res.json();
+
+                    if (subdirs.length === 0) {
+                        childrenDiv.innerHTML = '<div style="margin-left:20px; color:#aaa; font-style:italic;">(Empty or No subfolders)</div>';
+                    } else {
+                        for (const sub of subdirs) {
+                            const subItem = document.createElement('div');
+                            subItem.className = 'tree-item';
+
+                            const subToggle = document.createElement('span');
+                            subToggle.className = 'tree-toggle';
+                            subToggle.innerText = '▶';
+                            subToggle.setAttribute('data-path', sub.path);
+                            subToggle.onclick = function() { toggleFolder(this); };
+
+                            const subCb = document.createElement('input');
+                            subCb.type = 'checkbox';
+                            subCb.value = sub.path;
+                            updateCheckboxVisual(subCb, getCheckboxState(sub.path));
+                            subCb.onchange = function() { onCheckboxChange(this); };
+
+                            const subLabel = document.createElement('span');
+                            subLabel.innerHTML = ' 📁 ' + sub.name;
+
+                            const subChildren = document.createElement('div');
+                            subChildren.className = 'tree-children';
+
+                            subItem.appendChild(subToggle);
+                            subItem.appendChild(subCb);
+                            subItem.appendChild(subLabel);
+                            subItem.appendChild(subChildren);
+                            childrenDiv.appendChild(subItem);
+                        }
+                    }
+                }
+            } else {
+                element.innerText = '▶';
+                childrenDiv.classList.remove('open');
+            }
+        }
+
+        function onCheckboxChange(cb) {
+            cb.indeterminate = false;
+            if (cb.checked) {
+                selectedPaths.add(cb.value);
+            } else {
+                selectedPaths.delete(cb.value);
+            }
+        }
+
+        async function saveSelectedDirectories() {
+            const arr = Array.from(selectedPaths);
+            const statusMsg = document.getElementById('statusMsg');
+            statusMsg.innerText = 'Saving configuration & starting indexer...';
+
+            await fetch('/api/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({selected_directories: arr})
+            });
+
+            statusMsg.innerText = '✓ Indexer triggered in background!';
+            setTimeout(() => {
+                closeTreeModal();
+                statusMsg.innerText = '';
+                checkStatus();
+            }, 1500);
         }
     </script>
 </body>
@@ -601,6 +892,25 @@ class SearchHandler(SimpleHTTPRequestHandler):
             })
             return
 
+        # API: Available Drives
+        if parsed.path == '/api/drives':
+            drives = get_available_drives()
+            self.send_json(drives)
+            return
+
+        # API: Subdirectories
+        if parsed.path == '/api/ls':
+            parent_path = params.get('path', [''])[0]
+            subdirs = list_subdirectories(parent_path)
+            self.send_json(subdirs)
+            return
+
+        # API: Current Config
+        if parsed.path == '/api/config':
+            cfg = load_config()
+            self.send_json(cfg)
+            return
+
         # Render Main Search HTML
         query_str = params.get('q', [''])[0].strip()
         sort_by = params.get('sort', ['relevance'])[0].strip()
@@ -705,6 +1015,60 @@ class SearchHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
         self.wfile.write(html_out.encode('utf-8'))
+
+    def do_POST(self):
+        global INDEXER_PROCESS
+        parsed = urlparse(self.path)
+
+        # API: Stop Indexing
+        if parsed.path == '/api/stop_indexing':
+            if INDEXER_PROCESS and INDEXER_PROCESS.poll() is None:
+                try:
+                    INDEXER_PROCESS.terminate()
+                    INDEXER_PROCESS.wait(timeout=2)
+                except Exception:
+                    try:
+                        INDEXER_PROCESS.kill()
+                    except Exception:
+                        pass
+            INDEXER_PROCESS = None
+            self.send_json({"status": "ok", "message": "Indexing stopped."})
+            return
+
+        # API: Config and Start Indexing
+        if parsed.path == '/api/config':
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                save_config(data)
+
+                # Terminate any running instance first
+                if INDEXER_PROCESS and INDEXER_PROCESS.poll() is None:
+                    try:
+                        INDEXER_PROCESS.terminate()
+                    except Exception:
+                        pass
+
+                # Trigger ingest_documents.py as manageable subprocess
+                dirs = data.get("selected_directories", [])
+                if dirs:
+                    def run_ingest():
+                        global INDEXER_PROCESS
+                        try:
+                            cmd = [sys.executable, "ingest_documents.py", "--dir"] + dirs
+                            INDEXER_PROCESS = subprocess.Popen(cmd, cwd=os.path.dirname(__file__))
+                            INDEXER_PROCESS.wait()
+                        finally:
+                            INDEXER_PROCESS = None
+
+                    t = threading.Thread(target=run_ingest)
+                    t.daemon = True
+                    t.start()
+
+                self.send_json({"status": "ok", "message": "Saved and indexing started!"})
+            except Exception as e:
+                self.send_json({"status": "error", "message": str(e)}, status=500)
 
     def send_json(self, data, status=200):
         self.send_response(status)
