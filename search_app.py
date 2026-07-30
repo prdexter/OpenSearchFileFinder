@@ -1,8 +1,8 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Verified Direct Directory Opus Lister Launcher (/api/open_folder executes subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "NEW", "SELECT"]))
-- Verified Direct Windows File Launcher (/api/open_file executes os.startfile(norm_path))
+- Direct Directory Opus GUI Launcher (/api/open_folder triggers os.startfile(folder_path) + dopusrt.exe Go PATH=... SELECT=...)
+- Direct Windows File Launcher (/api/open_file executes os.startfile(norm_path))
 - Live UI Toast Notifications on button click for immediate visual feedback
 - Robust HTML data-path Attribute Handlers
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
@@ -617,13 +617,26 @@ class SearchHandler(SimpleHTTPRequestHandler):
             if file_path and os.path.exists(file_path):
                 try:
                     norm_path = os.path.normpath(file_path)
-                    
-                    if os.path.exists(DOPUS_RT):
-                        subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "NEW", "SELECT"])
-                    elif os.path.exists(DOPUS_EXE):
-                        subprocess.Popen([DOPUS_EXE, "/select", norm_path])
-                    else:
-                        subprocess.Popen(['explorer', '/select,', norm_path])
+                    folder_path = norm_path if os.path.isdir(norm_path) else os.path.dirname(norm_path)
+                    file_name = "" if os.path.isdir(norm_path) else os.path.basename(norm_path)
+
+                    # 1. Bring Directory Opus window to foreground on screen via os.startfile
+                    try:
+                        os.startfile(folder_path)
+                    except Exception:
+                        pass
+                        
+                    # 2. Select file inside Directory Opus Lister
+                    if file_name and os.path.exists(DOPUS_RT):
+                        try:
+                            subprocess.Popen([DOPUS_RT, "/cmd", "Go", f'PATH={folder_path}', f'SELECT={file_name}'])
+                        except Exception:
+                            pass
+                    elif file_name and os.path.exists(DOPUS_EXE):
+                        try:
+                            subprocess.Popen([DOPUS_EXE, "/select", norm_path])
+                        except Exception:
+                            pass
 
                     self.send_json({"status": "ok", "message": "Folder opened in Directory Opus"})
                 except Exception as e:
