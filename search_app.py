@@ -1,7 +1,7 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Directory Opus Lister Launcher (/api/open_folder executes dopusrt.exe /cmd Go <file_path> NEW SELECT)
+- Robust Interactive Shell Launcher for Directory Opus (/api/open_folder executes 'start "" dopusrt.exe /cmd Go <file_path> NEW SELECT')
 - Native Windows File Launcher (/api/open_file opens Word, Acrobat, Excel, etc.)
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
 - Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
@@ -276,8 +276,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             <div class="header-buttons">
                 <div class="count-badge" id="docCountBadge">📊 Total Indexed: ...</div>
-                <button class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
-                <button class="btn-index" id="indexBtn" onclick="toggleIndexing()">⚡ Start Indexing</button>
+                <button type="button" class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
+                <button type="button" class="btn-index" id="indexBtn" onclick="toggleIndexing()">⚡ Start Indexing</button>
             </div>
         </div>
 
@@ -314,7 +314,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             <div class="modal-footer">
                 <span id="statusMsg" style="font-size:13px; font-weight:bold; color:#007bff;"></span>
-                <button class="btn-save" onclick="saveSelectedDirectories()">Save & Start Indexer</button>
+                <button type="button" class="btn-save" onclick="saveSelectedDirectories()">Save & Start Indexer</button>
             </div>
         </div>
     </div>
@@ -330,7 +330,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         async function openFile(filePath) {
             try {
-                await fetch('/api/open_file?path=' + encodeURIComponent(filePath));
+                const res = await fetch('/api/open_file?path=' + encodeURIComponent(filePath));
+                const data = await res.json();
+                if (data.status !== 'ok') {
+                    alert('Could not open file: ' + data.message);
+                }
             } catch (e) {
                 alert('Error opening file: ' + e);
             }
@@ -338,7 +342,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         async function openFolder(filePath) {
             try {
-                await fetch('/api/open_folder?path=' + encodeURIComponent(filePath));
+                const res = await fetch('/api/open_folder?path=' + encodeURIComponent(filePath));
+                const data = await res.json();
+                if (data.status !== 'ok') {
+                    alert('Could not open folder in Directory Opus: ' + data.message);
+                }
             } catch (e) {
                 alert('Error opening folder in Directory Opus: ' + e);
             }
@@ -580,7 +588,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 except Exception as e:
                     self.send_json({"status": "error", "message": str(e)}, status=500)
             else:
-                self.send_json({"status": "error", "message": "File not found"}, status=404)
+                self.send_json({"status": "error", "message": f"File not found: {file_path}"}, status=404)
             return
 
         # API: Open Containing Folder directly in Directory Opus
@@ -590,18 +598,20 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 try:
                     norm_path = os.path.normpath(file_path)
                     
-                    # Force Directory Opus to open a NEW Lister and SELECT the file
                     if os.path.exists(DOPUS_RT):
-                        subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "NEW", "SELECT"])
+                        cmd = f'"{DOPUS_RT}" /cmd Go "{norm_path}" NEW SELECT'
+                        subprocess.Popen(f'start "" {cmd}', shell=True)
                     elif os.path.exists(DOPUS_EXE):
-                        subprocess.Popen([DOPUS_EXE, "/select", norm_path])
+                        cmd = f'"{DOPUS_EXE}" /select "{norm_path}"'
+                        subprocess.Popen(f'start "" {cmd}', shell=True)
                     else:
                         subprocess.Popen(['explorer', '/select,', norm_path])
+
                     self.send_json({"status": "ok", "message": "Folder opened in Directory Opus"})
                 except Exception as e:
                     self.send_json({"status": "error", "message": str(e)}, status=500)
             else:
-                self.send_json({"status": "error", "message": "Path not found"}, status=404)
+                self.send_json({"status": "error", "message": f"Path not found: {file_path}"}, status=404)
             return
 
         # API: Indexing Status & Total Count
@@ -687,8 +697,8 @@ class SearchHandler(SimpleHTTPRequestHandler):
                             <div class="result-header">
                                 <a class="file-title" onclick="openFile('{escaped_path}')" title="Click to open file in Windows">{fname}</a>
                                 <div class="card-actions">
-                                    <button class="btn-open-file" onclick="openFile('{escaped_path}')">↗️ Open File</button>
-                                    <button class="btn-open-folder" onclick="openFolder('{escaped_path}')" title="Open containing folder in Directory Opus">📁 Opus</button>
+                                    <button type="button" class="btn-open-file" onclick="openFile('{escaped_path}')">↗️ Open File</button>
+                                    <button type="button" class="btn-open-folder" onclick="openFolder('{escaped_path}')" title="Open containing folder in Directory Opus">📁 Opus</button>
                                     <span class="badge">{ftype}</span>
                                 </div>
                             </div>
