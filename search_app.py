@@ -2,10 +2,10 @@
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
 - Interactive Directory Tree Picker (with drive & folder checkboxes)
-- Robust data-path attribute handling for Windows backslashes
+- Automatic initial checking of configured directories from indexer_config.json
 - Smart extension parsing (pdf, docx, xlsx, txt, md, pptx)
 - Custom sorting (Relevance, Date, Name, Size)
-- Live indexing status trigger
+- Live background indexing pipeline trigger
 """
 
 import os
@@ -230,15 +230,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <script>
-        let selectedPaths = new Set({SELECTED_JSON});
+        let selectedPaths = new Set();
 
-        function openTreeModal() {
+        async function openTreeModal() {
             document.getElementById('treeModal').style.display = 'block';
+            const cfgRes = await fetch('/api/config');
+            const cfg = await cfgRes.json();
+            selectedPaths = new Set(cfg.selected_directories || []);
             loadDriveTree();
         }
 
         function closeTreeModal() {
             document.getElementById('treeModal').style.display = 'none';
+        }
+
+        function norm(p) {
+            return p ? p.toLowerCase().replace(/\\\\/g, '/').replace(/\/$/, '') : '';
+        }
+
+        function isPathSelected(checkPath) {
+            const cPath = norm(checkPath);
+            for (const sp of selectedPaths) {
+                if (norm(sp) === cPath) return true;
+            }
+            return false;
         }
 
         async function loadDriveTree() {
@@ -252,7 +267,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const driveItem = document.createElement('div');
                 driveItem.className = 'tree-item';
 
-                const isChecked = selectedPaths.has(drive) ? 'checked' : '';
+                const isChecked = isPathSelected(drive) ? 'checked' : '';
 
                 const toggleSpan = document.createElement('span');
                 toggleSpan.className = 'tree-toggle';
@@ -299,7 +314,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         for (const sub of subdirs) {
                             const subItem = document.createElement('div');
                             subItem.className = 'tree-item';
-                            const isChecked = selectedPaths.has(sub.path) ? 'checked' : '';
+                            const isChecked = isPathSelected(sub.path) ? 'checked' : '';
 
                             const subToggle = document.createElement('span');
                             subToggle.className = 'tree-toggle';
