@@ -1,8 +1,8 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Native Windows File Launching via /api/open_file (Click title or '↗️ Open File' button)
-- Windows Explorer Folder Launcher via /api/open_folder ('📁 Open Folder' button)
+- Direct Directory Opus Launcher (/api/open_folder opens dopus.exe /select <file_path>)
+- Native Windows File Launcher (/api/open_file opens Word, Acrobat, Excel, etc.)
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
 - Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
 - Strict AND matching for multi-word search terms
@@ -26,6 +26,8 @@ OPENSEARCH_HOST = "localhost"
 OPENSEARCH_PORT = 9200
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "indexer_config.json")
 KNOWN_EXTENSIONS = {'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'csv', 'md', 'rtf', 'pptx', 'ppt'}
+
+OPUS_EXE = r"C:\Program Files\GPSoftware\Directory Opus\dopus.exe"
 
 # System folders to hide from folder tree picker
 HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata', 'appdata'}
@@ -239,7 +241,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .btn-open-folder:hover { background-color: #e2e6ea; }
 
         .badge { background: #e9ecef; padding: 4px 10px; border-radius: 12px; font-size: 13px; text-transform: uppercase; font-weight: 600; color: #495057; }
-        .file-path { color: #6c757d; font-size: 13px; margin: 4px 0 10px 0; word-break: break-all; }
+        .file-path { color: #6c757d; font-size: 13px; margin: 4px 0 10px 0; word-break: break-all; cursor: pointer; }
+        .file-path:hover { text-decoration: underline; color: #007bff; }
         .snippet { background: #f8f9fa; padding: 10px; border-left: 4px solid #007bff; border-radius: 4px; font-size: 14px; color: #495057; line-height: 1.5; }
         mark { background-color: #ffe066; padding: 2px 4px; border-radius: 3px; font-weight: bold; }
 
@@ -579,13 +582,16 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 self.send_json({"status": "error", "message": "File not found"}, status=404)
             return
 
-        # API: Open Containing Folder in File Explorer
+        # API: Open Containing Folder directly in Directory Opus (or Explorer)
         if parsed.path == '/api/open_folder':
             file_path = params.get('path', [''])[0]
             if file_path and os.path.exists(file_path):
                 try:
-                    subprocess.run(['explorer', '/select,', os.path.normpath(file_path)])
-                    self.send_json({"status": "ok", "message": "Folder opened successfully"})
+                    if os.path.exists(OPUS_EXE):
+                        subprocess.Popen([OPUS_EXE, "/select", file_path])
+                    else:
+                        subprocess.Popen(['explorer', '/select,', os.path.normpath(file_path)])
+                    self.send_json({"status": "ok", "message": "Folder opened in Directory Opus"})
                 except Exception as e:
                     self.send_json({"status": "error", "message": str(e)}, status=500)
             else:
@@ -676,11 +682,11 @@ class SearchHandler(SimpleHTTPRequestHandler):
                                 <a class="file-title" onclick="openFile('{escaped_path}')" title="Click to open file in Windows">{fname}</a>
                                 <div class="card-actions">
                                     <button class="btn-open-file" onclick="openFile('{escaped_path}')">↗️ Open File</button>
-                                    <button class="btn-open-folder" onclick="openFolder('{escaped_path}')">📁 Folder</button>
+                                    <button class="btn-open-folder" onclick="openFolder('{escaped_path}')" title="Open containing folder in Directory Opus">📁 Opus</button>
                                     <span class="badge">{ftype}</span>
                                 </div>
                             </div>
-                            <div class="file-path">📁 {fpath}</div>
+                            <div class="file-path" onclick="openFolder('{escaped_path}')" title="Click to open folder in Directory Opus">📁 {fpath}</div>
                             <div class="snippet">{snippet_text}</div>
                         </div>
                         """
