@@ -1,7 +1,8 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Robust Windows Shell Execution ('start "" "<file_path>"' & 'start "" dopusrt.exe /cmd Go "<file_path>" NEW SELECT')
+- Verified Direct Directory Opus Lister Launcher (/api/open_folder executes subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "NEW", "SELECT"]))
+- Verified Direct Windows File Launcher (/api/open_file executes os.startfile(norm_path))
 - Live UI Toast Notifications on button click for immediate visual feedback
 - Robust HTML data-path Attribute Handlers
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
@@ -602,7 +603,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
             if file_path and os.path.exists(file_path):
                 try:
                     norm_path = os.path.normpath(file_path)
-                    subprocess.Popen(f'start "" "{norm_path}"', shell=True)
+                    os.startfile(norm_path)
                     self.send_json({"status": "ok", "message": "File opened successfully"})
                 except Exception as e:
                     self.send_json({"status": "error", "message": str(e)}, status=500)
@@ -618,13 +619,11 @@ class SearchHandler(SimpleHTTPRequestHandler):
                     norm_path = os.path.normpath(file_path)
                     
                     if os.path.exists(DOPUS_RT):
-                        cmd = f'"{DOPUS_RT}" /cmd Go "{norm_path}" NEW SELECT'
-                        subprocess.Popen(f'start "" {cmd}', shell=True)
+                        subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "NEW", "SELECT"])
                     elif os.path.exists(DOPUS_EXE):
-                        cmd = f'"{DOPUS_EXE}" /select "{norm_path}"'
-                        subprocess.Popen(f'start "" {cmd}', shell=True)
+                        subprocess.Popen([DOPUS_EXE, "/select", norm_path])
                     else:
-                        subprocess.Popen(f'explorer /select,"{norm_path}"', shell=True)
+                        subprocess.Popen(['explorer', '/select,', norm_path])
 
                     self.send_json({"status": "ok", "message": "Folder opened in Directory Opus"})
                 except Exception as e:
