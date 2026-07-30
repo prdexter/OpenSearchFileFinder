@@ -1,13 +1,12 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Restored Header Controls ('📁 Index Directories' and '⚡ Start Indexing' buttons)
-- Interactive Directory Tree Picker with Tri-State Indeterminate Checkboxes
+- Full Search Results Pagination (Top & Bottom Navigation Bar, e.g. "Showing 101 - 200 of 350", "Next 100 of 350")
 - 4 ms Native PIL DOCX & PyMuPDF Page 1 Document Thumbnail Generator & Cache (/api/thumbnail?path=...)
 - Mammoth.js & HTML5 In-Browser Live Document Previewer (/api/raw_file?path=...)
 - 300px 2-Column Result Cards with Page 1 Previews on the Right Side
 - Direct Windows Custom URI Protocols (openfile://, openopus://, openexplorer://)
-- Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
+- Live Document Counter badge in main header ('📊 14,096 Documents Indexed')
 """
 
 import os
@@ -22,6 +21,7 @@ import threading
 import subprocess
 import hashlib
 import zipfile
+import math
 import xml.etree.ElementTree as ET
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
@@ -35,6 +35,7 @@ OPENSEARCH_PORT = 9200
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "indexer_config.json")
 THUMB_CACHE_DIR = os.path.join(os.path.dirname(__file__), ".cache_thumbnails")
 KNOWN_EXTENSIONS = {'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'csv', 'md', 'rtf', 'pptx', 'ppt'}
+PAGE_SIZE = 100
 
 DOPUS_RT = r"C:\Program Files\GPSoftware\Directory Opus\dopusrt.exe"
 DOPUS_EXE = r"C:\Program Files\GPSoftware\Directory Opus\dopus.exe"
@@ -50,10 +51,6 @@ if not os.path.exists(THUMB_CACHE_DIR):
 
 
 def generate_fast_docx_cover(file_path, cache_path):
-    """
-    Renders a high-resolution 600x720 Document Cover Card JPEG in 4 milliseconds.
-    Extracts title & text directly from word/document.xml without launching Word.
-    """
     file_name = os.path.basename(file_path)
     snippet = ""
     try:
@@ -67,26 +64,19 @@ def generate_fast_docx_cover(file_path, cache_path):
     except Exception:
         pass
 
-    # Create 600x720 canvas
     img = Image.new('RGB', (600, 720), color='#ffffff')
     draw = ImageDraw.Draw(img)
 
-    # Outer border & header banner
     draw.rectangle([0, 0, 599, 719], outline='#dee2e6', width=2)
     draw.rectangle([0, 0, 600, 18], fill='#007bff')
     draw.rectangle([0, 18, 600, 110], fill='#f8f9fa')
 
-    # Header title & document extension badge
     draw.text((30, 38), "MICROSOFT WORD DOCUMENT", fill='#6c757d')
     draw.text((30, 65), file_name[:42], fill='#007bff')
 
-    # Accent divider line
     draw.rectangle([30, 140, 570, 143], fill='#007bff')
-    
-    # Left accent border for text snippet block
     draw.rectangle([30, 160, 36, 680], fill='#007bff')
 
-    # Draw text preview snippet
     y = 165
     if snippet:
         words = snippet.split()
@@ -109,16 +99,12 @@ def generate_fast_docx_cover(file_path, cache_path):
 
 
 def get_thumbnail_bytes(file_path):
-    """
-    Generates or retrieves Page 1 thumbnail JPEG bytes for PDF, DOCX, and Image files.
-    """
     if not os.path.exists(file_path):
         return None, None
 
     file_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
     cache_path = os.path.join(THUMB_CACHE_DIR, f"{file_hash}.jpg")
 
-    # Serve cached thumbnail if it exists
     if os.path.exists(cache_path):
         try:
             with open(cache_path, 'rb') as f:
@@ -128,7 +114,6 @@ def get_thumbnail_bytes(file_path):
 
     ext = os.path.splitext(file_path)[1].lower().lstrip('.')
 
-    # 1. Render PDF Page 1 Thumbnail via PyMuPDF (15 ms)
     if ext == 'pdf':
         try:
             doc = fitz.open(file_path)
@@ -142,7 +127,6 @@ def get_thumbnail_bytes(file_path):
         except Exception:
             pass
 
-    # 2. Render DOCX Page 1 Thumbnail via Fast PIL Cover Card (4 ms)
     elif ext in ('docx', 'doc'):
         try:
             generate_fast_docx_cover(file_path, cache_path)
@@ -151,7 +135,6 @@ def get_thumbnail_bytes(file_path):
         except Exception:
             pass
 
-    # 3. Render Image Files Directly
     elif ext in ('jpg', 'jpeg', 'png', 'bmp', 'webp'):
         try:
             with open(file_path, 'rb') as f:
@@ -226,7 +209,7 @@ def list_subdirectories(parent_path: str):
     return subdirs
 
 
-def parse_smart_query(user_query: str, sort_by: str = "relevance"):
+def parse_smart_query(user_query: str, sort_by: str = "relevance", page: int = 1, page_size: int = PAGE_SIZE):
     raw_query = user_query.strip()
     raw_query = re.sub(r'NOT\s*\(\s*([^)]+)\s*\)', r' NOT \1 ', raw_query, flags=re.IGNORECASE)
     
@@ -321,7 +304,10 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance"):
             "content": {"fragment_size": 200, "number_of_fragments": 2}
         }
     }
-    query_body["size"] = 100
+    
+    # Pagination
+    query_body["from"] = (page - 1) * page_size
+    query_body["size"] = page_size
     return query_body
 
 
@@ -358,6 +344,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .stats { color: #6c757d; font-weight: 500; }
         .toast-notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 14px 28px; border-radius: 6px; font-size: 15px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; z-index: 2000; }
         .index-badge { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; }
+
+        /* Pagination Bar Styles */
+        .pagination-bar { display: flex; justify-content: space-between; align-items: center; background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 12px 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+        .pagination-bar .page-info { font-weight: bold; color: #495057; font-size: 15px; }
+        .btn-page { text-decoration: none; padding: 9px 18px; border-radius: 6px; background-color: #007bff; color: white; font-weight: bold; font-size: 14px; transition: background-color 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-page:hover { background-color: #0056b3; color: white; }
+        .btn-page.disabled { background-color: #e9ecef; color: #adb5bd; pointer-events: none; cursor: default; }
 
         /* 2-Column Result Card Layout with 300px Right Column Preview */
         .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; gap: 20px; align-items: flex-start; }
@@ -449,7 +442,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <div class="index-badge" id="indexStatusBadge">⏳ Indexing active in background...</div>
         </div>
 
+        {PAGINATION_TOP}
+
         {RESULTS}
+
+        {PAGINATION_BOTTOM}
     </div>
 
     <div class="toast-notification" id="toastMsg"></div>
@@ -914,12 +911,20 @@ class SearchHandler(SimpleHTTPRequestHandler):
         # Render Main Search HTML
         query_str = params.get('q', [''])[0].strip()
         sort_by = params.get('sort', ['relevance'])[0].strip()
+        
+        try:
+            page = int(params.get('page', ['1'])[0])
+            if page < 1:
+                page = 1
+        except Exception:
+            page = 1
 
         cfg = load_config()
         selected_json = json.dumps(cfg.get('selected_directories', []))
 
         stats_html = ""
         results_html = ""
+        pagination_html = ""
 
         sort_state = {
             "SORT_RELEVANCE": "selected" if sort_by == "relevance" else "",
@@ -932,14 +937,38 @@ class SearchHandler(SimpleHTTPRequestHandler):
         if query_str:
             try:
                 client = get_client()
-                es_query = parse_smart_query(query_str, sort_by=sort_by)
+                es_query = parse_smart_query(query_str, sort_by=sort_by, page=page, page_size=PAGE_SIZE)
                 res = client.search(index="documents", body=es_query)
 
                 hits = res['hits']['hits']
                 total = res['hits']['total']['value']
                 took = res['took']
 
+                total_pages = math.ceil(total / PAGE_SIZE) if total > 0 else 1
+                start_doc = (page - 1) * PAGE_SIZE + 1 if total > 0 else 0
+                end_doc = min(page * PAGE_SIZE, total)
+
                 stats_html = f"Found {total:,} matching document(s) in {took} ms"
+
+                # Build Pagination Controls
+                if total > 0:
+                    prev_disabled = "disabled" if page <= 1 else ""
+                    prev_page = page - 1 if page > 1 else 1
+                    prev_url = f"/?q={urllib.parse.quote(query_str)}&sort={sort_by}&page={prev_page}"
+
+                    next_disabled = "disabled" if end_doc >= total else ""
+                    next_page = page + 1 if end_doc < total else page
+                    next_count = min(PAGE_SIZE, total - end_doc)
+                    next_label = f"Next {next_count} of {total:,} ➡️" if next_count > 0 else "Next ➡️"
+                    next_url = f"/?q={urllib.parse.quote(query_str)}&sort={sort_by}&page={next_page}"
+
+                    pagination_html = f"""
+                    <div class="pagination-bar">
+                        <a href="{prev_url}" class="btn-page {prev_disabled}">⬅️ Previous 100</a>
+                        <span class="page-info">Showing {start_doc:,} - {end_doc:,} of {total:,} documents (Page {page} of {total_pages})</span>
+                        <a href="{next_url}" class="btn-page {next_disabled}">{next_label}</a>
+                    </div>
+                    """
 
                 if not hits:
                     results_html = "<div class='result-card'>No matching documents found.</div>"
@@ -1008,6 +1037,8 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 results_html = f"<div class='result-card' style='color:red;'>Error executing search: {e}</div>"
 
         html_out = HTML_TEMPLATE.replace("{QUERY}", query_str).replace("{STATS}", stats_html).replace("{RESULTS}", results_html).replace("{SELECTED_JSON}", selected_json)
+        html_out = html_out.replace("{PAGINATION_TOP}", pagination_html).replace("{PAGINATION_BOTTOM}", pagination_html)
+        
         for key, val in sort_state.items():
             html_out = html_out.replace(f"{{{key}}}", val)
 
