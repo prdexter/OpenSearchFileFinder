@@ -1,12 +1,11 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Win32 Foreground Window Activator (Uses AllowSetForegroundWindow(-1) & SetForegroundWindow to override Windows focus suppression)
-- Verifies Window Visibility on Screen & Reports Status
+- Win32 Foreground Window Activator with 0.8s Delay & Full Title Reporting
+- Uniform Toast Notifications displaying visible window counts for File, Explorer, and Opus
 - Native Windows File Launcher (/api/open_file executes os.startfile(norm_path))
 - Direct Windows File Explorer Launcher (/api/open_folder?explorer=1)
 - Directory Opus Launcher (/api/open_folder executes dopusrt.exe /cmd Go <file_path> NEW SELECT)
-- Live UI Toast Notifications on button click for immediate visual feedback
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
 - Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
 - Strict AND matching for multi-word search terms
@@ -51,10 +50,10 @@ EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
 def force_foreground_window(search_keywords):
     """
     Overrides Windows Focus Stealing Prevention (Session 0 Isolation)
-    and forces the target GUI window into the visible foreground on screen.
+    and forces target GUI window into visible foreground on screen.
     """
     user32.AllowSetForegroundWindow(-1)  # ASFW_ANY
-    time.sleep(0.3)
+    time.sleep(0.8)
 
     found_windows = []
 
@@ -68,7 +67,7 @@ def force_foreground_window(search_keywords):
                 t_lower = title.lower()
                 for kw in search_keywords:
                     if kw.lower() in t_lower:
-                        found_windows.append((hwnd, title))
+                        found_windows.append({"hwnd": hwnd, "title": title})
                         user32.ShowWindow(hwnd, 9)  # SW_RESTORE
                         user32.SetForegroundWindow(hwnd)
                         break
@@ -280,7 +279,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .card-actions { display: flex; align-items: center; gap: 8px; }
         .btn-open-file { background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
         .btn-open-file:hover { background-color: #0056b3; }
-        .btn-open-explorer { background-color: #17a2b8; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .btn-open-explorer { background-color: #17a2b8; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: gap: 4px; }
         .btn-open-explorer:hover { background-color: #138496; }
         .btn-open-folder { background-color: #6f42c1; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
         .btn-open-folder:hover { background-color: #593196; }
@@ -390,7 +389,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const res = await fetch('/api/open_file?path=' + encodeURIComponent(filePath));
                 const data = await res.json();
                 if (data.status === 'ok') {
-                    showToast('✓ Opened on screen! (' + data.visible_windows + ' window visible)');
+                    showToast('✓ Opened file on screen! (' + data.visible_windows + ' window visible)');
                 } else {
                     showToast('Could not open file: ' + data.message, true);
                 }
@@ -407,7 +406,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const res = await fetch('/api/open_folder?explorer=1&path=' + encodeURIComponent(filePath));
                 const data = await res.json();
                 if (data.status === 'ok') {
-                    showToast('✓ Opened File Explorer on screen!');
+                    showToast('✓ Opened File Explorer on screen! (' + data.visible_windows + ' window visible)');
                 } else {
                     showToast('Could not open Explorer: ' + data.message, true);
                 }
@@ -424,7 +423,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const res = await fetch('/api/open_folder?path=' + encodeURIComponent(filePath));
                 const data = await res.json();
                 if (data.status === 'ok') {
-                    showToast('✓ Opened Directory Opus on screen!');
+                    showToast('✓ Opened Directory Opus on screen! (' + data.visible_windows + ' window visible)');
                 } else {
                     showToast('Could not open Opus: ' + data.message, true);
                 }
