@@ -1,7 +1,7 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- True Excel Grid Visual Preview Card Generator (with A,B,C... 1,2,3... gridlines, green ribbon, formula bar & color fills)
+- High-Precision True Excel Visual Preview Card Generator (reads exact ARGB cell fill colors, font colors, bold styles, TrueType fonts, Unicode bullet points & dynamic column widths)
 - Fast 4 ms Visual Cover Card Previews for ALL Human Document Types (PDF, DOCX, XLSX, PPTX, TXT, MD, CSV, RTF)
 - Full Search Results Pagination (Top & Bottom Navigation Bar, e.g. "Showing 101 - 200 of 350", "Next 100 of 350")
 - SheetJS & Mammoth.js In-Browser Live Document Previewers (/api/raw_file?path=...)
@@ -28,7 +28,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 from pathlib import Path
 from opensearchpy import OpenSearch
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import fitz  # PyMuPDF for PDF thumbnail rendering
 
 try:
@@ -54,6 +54,23 @@ INDEXER_PROCESS = None
 
 if not os.path.exists(THUMB_CACHE_DIR):
     os.makedirs(THUMB_CACHE_DIR, exist_ok=True)
+
+
+def parse_hex_color(openpyxl_color, default='#ffffff'):
+    if not openpyxl_color:
+        return default
+    try:
+        if hasattr(openpyxl_color, 'rgb') and openpyxl_color.rgb:
+            s = str(openpyxl_color.rgb)
+            if len(s) == 8:
+                if s[:2] == '00':
+                    return default
+                return '#' + s[2:]
+            elif len(s) == 6:
+                return '#' + s
+    except Exception:
+        pass
+    return default
 
 
 def generate_fast_docx_cover(file_path, cache_path):
@@ -106,75 +123,108 @@ def generate_fast_docx_cover(file_path, cache_path):
 
 def generate_fast_xlsx_cover(file_path, cache_path):
     """
-    Renders a True Excel Spreadsheet Grid Preview Card with grid lines (A,B,C... 1,2,3...),
-    formula bar, green Excel ribbon, cell background colors, and column data rows.
+    Renders a High-Precision True Excel Visual Preview Card.
+    Extracts exact ARGB cell background fill colors, font colors, bold styles, TrueType fonts,
+    Unicode bullets ('•'), non-breaking spaces, and dynamic column widths directly from openpyxl.
     """
     file_name = os.path.basename(file_path)
     img = Image.new('RGB', (600, 720), color='#ffffff')
     draw = ImageDraw.Draw(img)
 
+    # Load system TrueType font for clean Unicode & bullet character rendering
+    try:
+        font_regular = ImageFont.truetype("arial.ttf", 12)
+        font_bold = ImageFont.truetype("arialbd.ttf", 12)
+        font_header = ImageFont.truetype("arialbd.ttf", 13)
+    except Exception:
+        font_regular = font_bold = font_header = ImageFont.load_default()
+
     # 1. Outer Border & Excel Green Ribbon
     draw.rectangle([0, 0, 599, 719], outline='#217346', width=2)
-    draw.rectangle([0, 0, 600, 32], fill='#217346')
-    draw.text((15, 8), f"Excel  |  {file_name[:45]}", fill='#ffffff')
+    draw.rectangle([0, 0, 600, 30], fill='#217346')
+    draw.text((15, 7), f"Excel  |  {file_name[:45]}", fill='#ffffff', font=font_header)
 
     # 2. Formula Bar
-    draw.rectangle([0, 32, 600, 56], fill='#f3f3f3', outline='#d0d0d0')
-    draw.text((12, 37), "fx", fill='#666666')
-    draw.rectangle([40, 35, 590, 53], fill='#ffffff', outline='#d0d0d0')
+    draw.rectangle([0, 30, 600, 54], fill='#f3f3f3', outline='#d0d0d0')
+    draw.text((12, 35), "fx", fill='#666666', font=font_bold)
+    draw.rectangle([40, 33, 590, 51], fill='#ffffff', outline='#d0d0d0')
 
-    # 3. Column Headers (A, B, C, D, E, F)
-    cols = ['A', 'B', 'C', 'D', 'E', 'F']
-    col_widths = [35, 110, 80, 80, 140, 115]
-    
-    draw.rectangle([0, 56, 600, 80], fill='#e6e6e6', outline='#d0d0d0')
-    draw.text((12, 61), "#", fill='#555555')
-    
-    x = 40
-    for i, col in enumerate(cols):
-        w = col_widths[i]
-        draw.rectangle([x, 56, x + w, 80], fill='#e6e6e6', outline='#c0c0c0')
-        draw.text((x + 10, 61), col, fill='#333333')
-        x += w
-
-    # 4. Read Data Cells via openpyxl
-    rows_data = []
+    # Read data cells & styles via openpyxl
+    rows_cells = []
     try:
         if openpyxl is not None:
-            wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+            wb = openpyxl.load_workbook(file_path, data_only=True)
             ws = wb.active
-            for row in ws.iter_rows(values_only=True, max_row=26):
-                rows_data.append([str(v) if v is not None else '' for v in row[:6]])
+            rows_cells = list(ws.iter_rows(max_row=26))
     except Exception:
         pass
 
-    # 5. Render Grid Rows (1 to 24)
-    y = 80
-    row_h = 25
-    for row_idx in range(1, 25):
+    # Dynamic Column Width Calculation
+    cols = ['A', 'B', 'C', 'D', 'E', 'F']
+    col_widths = []
+    for c_idx in range(6):
+        max_len = 10
+        for r_cells in rows_cells:
+            if c_idx < len(r_cells) and r_cells[c_idx].value:
+                v_str = str(r_cells[c_idx].value).replace('\xa0', ' ').replace('\ufffd', '•').strip()
+                if len(v_str) > max_len:
+                    max_len = len(v_str)
+        # Scale column width nicely between 60 and 260 px
+        col_widths.append(max(60, min(260, max_len * 7 + 16)))
+
+    # 3. Column Headers (A, B, C, D, E, F)
+    draw.rectangle([0, 54, 600, 76], fill='#e6e6e6', outline='#d0d0d0')
+    draw.text((10, 58), "#", fill='#555555', font=font_bold)
+
+    x = 40
+    for i, col in enumerate(cols):
+        w = col_widths[i]
+        draw.rectangle([x, 54, x + w, 76], fill='#e6e6e6', outline='#c0c0c0')
+        draw.text((x + (w // 2) - 5, 58), col, fill='#333333', font=font_bold)
+        x += w
+
+    # 4. Render True Grid Rows (1 to 25)
+    y = 76
+    row_h = 24
+    for row_idx in range(1, 26):
         if y > 700:
             break
         # Row Header Number (1, 2, 3...)
         draw.rectangle([0, y, 40, y + row_h], fill='#e6e6e6', outline='#c0c0c0')
-        draw.text((10, y + 5), str(row_idx), fill='#555555')
+        draw.text((10, y + 4), str(row_idx), fill='#555555', font=font_regular)
 
-        row_vals = rows_data[row_idx - 1] if row_idx <= len(rows_data) else ['', '', '', '', '', '']
+        row_cells = rows_cells[row_idx - 1] if row_idx <= len(rows_cells) else []
 
         x = 40
         for i in range(6):
             w = col_widths[i]
-            val = row_vals[i] if i < len(row_vals) else ''
-            
-            # Cell Background Fills (Green/Yellow Accent Colors matching real Excel sheets)
-            cell_fill = '#ffffff'
-            if row_idx == 1 or 'variable' in val.lower() or 'field' in val.lower() or 'green' in val.lower():
-                cell_fill = '#e2efda'  # Soft Green Excel Fill
-            elif 'delete' in val.lower() or 'vital' in val.lower() or 'radio' in val.lower() or 'calc' in val.lower():
-                cell_fill = '#fff2cc'  # Soft Yellow Cell Fill
-            
-            draw.rectangle([x, y, x + w, y + row_h], fill=cell_fill, outline='#e0e0e0')
-            if val:
-                draw.text((x + 6, y + 5), val[:20], fill='#111111')
+            cell = row_cells[i] if i < len(row_cells) else None
+
+            val_str = ""
+            fill_color = '#ffffff'
+            font_color = '#111111'
+            is_bold = False
+
+            if cell:
+                if cell.value is not None:
+                    val_str = str(cell.value).replace('\xa0', ' ').replace('\ufffd', '•').strip()
+
+                if cell.fill and cell.fill.start_color:
+                    fill_color = parse_hex_color(cell.fill.start_color, '#ffffff')
+
+                if cell.font:
+                    if cell.font.color:
+                        font_color = parse_hex_color(cell.font.color, '#111111')
+                        # Handle white font on white cell fallback
+                        if font_color == '#ffffff' and fill_color in ('#ffffff', '#00000000'):
+                            font_color = '#111111'
+                    if cell.font.bold:
+                        is_bold = True
+
+            draw.rectangle([x, y, x + w, y + row_h], fill=fill_color, outline='#e0e0e0')
+            if val_str:
+                use_font = font_bold if is_bold else font_regular
+                draw.text((x + 6, y + 4), val_str[:32], fill=font_color, font=use_font)
             x += w
         y += row_h
 
