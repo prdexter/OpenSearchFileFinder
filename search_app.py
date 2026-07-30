@@ -1,11 +1,8 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Win32 Foreground Window Activator with 0.8s Delay & Full Title Reporting
-- Uniform Toast Notifications displaying visible window counts for File, Explorer, and Opus
-- Native Windows File Launcher (/api/open_file executes os.startfile(norm_path))
-- Direct Windows File Explorer Launcher (/api/open_folder?explorer=1)
-- Directory Opus Launcher (/api/open_folder executes dopusrt.exe /cmd Go <file_path> NEW SELECT)
+- Direct Windows URI Custom Protocols (openfile://, openopus://, openexplorer://)
+- Native User-Initiated Application Activation (Bypasses Session 0 Isolation & Focus Suppression)
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
 - Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
 - Strict AND matching for multi-word search terms
@@ -19,8 +16,7 @@ import json
 import string
 import sys
 import html
-import time
-import ctypes
+import urllib.parse
 import threading
 import subprocess
 from http.server import HTTPServer, SimpleHTTPRequestHandler
@@ -41,40 +37,6 @@ HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program 
 
 # Global variables to track active background indexer process
 INDEXER_PROCESS = None
-
-user32 = ctypes.windll.user32
-EnumWindows = user32.EnumWindows
-EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
-
-
-def force_foreground_window(search_keywords):
-    """
-    Overrides Windows Focus Stealing Prevention (Session 0 Isolation)
-    and forces target GUI window into visible foreground on screen.
-    """
-    user32.AllowSetForegroundWindow(-1)  # ASFW_ANY
-    time.sleep(0.8)
-
-    found_windows = []
-
-    def foreach_window(hwnd, lparam):
-        if user32.IsWindowVisible(hwnd):
-            length = user32.GetWindowTextLengthW(hwnd)
-            if length > 0:
-                buff = ctypes.create_unicode_buffer(length + 1)
-                user32.GetWindowTextW(hwnd, buff, length + 1)
-                title = buff.value
-                t_lower = title.lower()
-                for kw in search_keywords:
-                    if kw.lower() in t_lower:
-                        found_windows.append({"hwnd": hwnd, "title": title})
-                        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-                        user32.SetForegroundWindow(hwnd)
-                        break
-        return True
-
-    EnumWindows(EnumWindowsProc(foreach_window), 0)
-    return found_windows
 
 
 def get_client():
@@ -268,24 +230,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .stats-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .stats { color: #6c757d; font-weight: 500; }
-        .toast-notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 14px 28px; border-radius: 6px; font-size: 15px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; z-index: 2000; }
         .index-badge { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; }
 
         .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .result-header { display: flex; justify-content: space-between; align-items: center; }
-        .file-title { font-weight: bold; font-size: 17px; color: #007bff; cursor: pointer; text-decoration: none; }
+        .file-title { font-weight: bold; font-size: 17px; color: #007bff; text-decoration: none; }
         .file-title:hover { text-decoration: underline; color: #0056b3; }
         
         .card-actions { display: flex; align-items: center; gap: 8px; }
-        .btn-open-file { background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-        .btn-open-file:hover { background-color: #0056b3; }
-        .btn-open-explorer { background-color: #17a2b8; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: gap: 4px; }
-        .btn-open-explorer:hover { background-color: #138496; }
-        .btn-open-folder { background-color: #6f42c1; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-        .btn-open-folder:hover { background-color: #593196; }
+        .btn-action { text-decoration: none; padding: 6px 12px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; border: none; }
+        .btn-open-file { background-color: #007bff; color: white; }
+        .btn-open-file:hover { background-color: #0056b3; color: white; }
+        .btn-open-explorer { background-color: #17a2b8; color: white; }
+        .btn-open-explorer:hover { background-color: #138496; color: white; }
+        .btn-open-folder { background-color: #6f42c1; color: white; }
+        .btn-open-folder:hover { background-color: #593196; color: white; }
 
         .badge { background: #e9ecef; padding: 4px 10px; border-radius: 12px; font-size: 13px; text-transform: uppercase; font-weight: 600; color: #495057; }
-        .file-path { color: #6c757d; font-size: 13px; margin: 4px 0 10px 0; word-break: break-all; cursor: pointer; }
+        .file-path { color: #6c757d; font-size: 13px; margin: 4px 0 10px 0; word-break: break-all; text-decoration: none; display: inline-block; }
         .file-path:hover { text-decoration: underline; color: #007bff; }
         .snippet { background: #f8f9fa; padding: 10px; border-left: 4px solid #007bff; border-radius: 4px; font-size: 14px; color: #495057; line-height: 1.5; }
         mark { background-color: #ffe066; padding: 2px 4px; border-radius: 3px; font-weight: bold; }
@@ -344,8 +306,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         {RESULTS}
     </div>
 
-    <div class="toast-notification" id="toastMsg"></div>
-
     <!-- Directory Tree Picker Modal -->
     <div id="treeModal" class="modal">
         <div class="modal-content">
@@ -372,65 +332,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             checkStatus();
             setInterval(checkStatus, 3000);
         });
-
-        function showToast(msg, isError=false) {
-            const toast = document.getElementById('toastMsg');
-            toast.innerText = msg;
-            toast.style.backgroundColor = isError ? '#dc3545' : '#28a745';
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 4000);
-        }
-
-        async function handleOpenFile(element) {
-            const filePath = element.getAttribute('data-path');
-            if (!filePath) return;
-            showToast('Opening file in default application...');
-            try {
-                const res = await fetch('/api/open_file?path=' + encodeURIComponent(filePath));
-                const data = await res.json();
-                if (data.status === 'ok') {
-                    showToast('✓ Opened file on screen! (' + data.visible_windows + ' window visible)');
-                } else {
-                    showToast('Could not open file: ' + data.message, true);
-                }
-            } catch (e) {
-                showToast('Error opening file: ' + e, true);
-            }
-        }
-
-        async function handleOpenExplorer(element) {
-            const filePath = element.getAttribute('data-path');
-            if (!filePath) return;
-            showToast('Opening folder in File Explorer...');
-            try {
-                const res = await fetch('/api/open_folder?explorer=1&path=' + encodeURIComponent(filePath));
-                const data = await res.json();
-                if (data.status === 'ok') {
-                    showToast('✓ Opened File Explorer on screen! (' + data.visible_windows + ' window visible)');
-                } else {
-                    showToast('Could not open Explorer: ' + data.message, true);
-                }
-            } catch (e) {
-                showToast('Error opening Explorer: ' + e, true);
-            }
-        }
-
-        async function handleOpenFolder(element) {
-            const filePath = element.getAttribute('data-path');
-            if (!filePath) return;
-            showToast('Opening folder in Directory Opus...');
-            try {
-                const res = await fetch('/api/open_folder?path=' + encodeURIComponent(filePath));
-                const data = await res.json();
-                if (data.status === 'ok') {
-                    showToast('✓ Opened Directory Opus on screen! (' + data.visible_windows + ' window visible)');
-                } else {
-                    showToast('Could not open Opus: ' + data.message, true);
-                }
-            } catch (e) {
-                showToast('Error opening Directory Opus: ' + e, true);
-            }
-        }
 
         async function checkStatus() {
             try {
@@ -658,59 +559,6 @@ class SearchHandler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
 
-        # API: Open File in Windows Default App
-        if parsed.path == '/api/open_file':
-            file_path = params.get('path', [''])[0]
-            if file_path and os.path.exists(file_path):
-                try:
-                    norm_path = os.path.normpath(file_path)
-                    user32.AllowSetForegroundWindow(-1)
-                    os.startfile(norm_path)
-                    
-                    fname = os.path.basename(norm_path)
-                    found = force_foreground_window([fname, "word", "acrobat", "pdf", "excel", "notepad"])
-                    self.send_json({"status": "ok", "message": "File opened successfully", "visible_windows": len(found)})
-                except Exception as e:
-                    self.send_json({"status": "error", "message": str(e)}, status=500)
-            else:
-                self.send_json({"status": "error", "message": f"File not found: {file_path}"}, status=404)
-            return
-
-        # API: Open Containing Folder directly in Windows File Explorer or Directory Opus
-        if parsed.path == '/api/open_folder':
-            file_path = params.get('path', [''])[0]
-            force_explorer = params.get('explorer', ['0'])[0] == '1'
-
-            if file_path and os.path.exists(file_path):
-                try:
-                    norm_path = os.path.normpath(file_path)
-                    folder_path = norm_path if os.path.isdir(norm_path) else os.path.dirname(norm_path)
-                    folder_name = os.path.basename(folder_path)
-
-                    user32.AllowSetForegroundWindow(-1)
-                    
-                    if force_explorer:
-                        # Direct Windows Explorer launch with file selected
-                        subprocess.Popen(['explorer', '/select,', norm_path])
-                        found = force_foreground_window([folder_name, 'Explorer', 'File Explorer'])
-                        self.send_json({"status": "ok", "message": "Folder opened in Windows Explorer", "visible_windows": len(found)})
-                    else:
-                        # Try Directory Opus first
-                        if os.path.exists(DOPUS_RT):
-                            subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "NEW", "SELECT"])
-                        elif os.path.exists(DOPUS_EXE):
-                            subprocess.Popen([DOPUS_EXE, "/select", norm_path])
-                        else:
-                            subprocess.Popen(['explorer', '/select,', norm_path])
-                            
-                        found = force_foreground_window([folder_name, 'Opus', 'Directory Opus', 'Explorer'])
-                        self.send_json({"status": "ok", "message": "Folder opened in Directory Opus", "visible_windows": len(found)})
-                except Exception as e:
-                    self.send_json({"status": "error", "message": str(e)}, status=500)
-            else:
-                self.send_json({"status": "error", "message": f"Path not found: {file_path}"}, status=404)
-            return
-
         # API: Indexing Status & Total Count
         if parsed.path == '/api/status':
             is_running = INDEXER_PROCESS is not None and INDEXER_PROCESS.poll() is None
@@ -778,7 +626,14 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         src = hit['_source']
                         fname = html.escape(src.get('file_name', 'Unnamed File'))
                         fpath = src.get('file_path', '')
-                        escaped_attr_path = html.escape(fpath)
+                        
+                        # Generate direct Windows Custom Protocol URLs
+                        encoded_path = urllib.parse.quote(fpath.replace('\\', '/'))
+                        open_file_url = f"openfile://{encoded_path}"
+                        open_opus_url = f"openopus://{encoded_path}"
+                        open_explorer_url = f"openexplorer://{encoded_path}"
+                        
+                        escaped_display_path = html.escape(fpath)
                         ftype = src.get('file_type', 'doc')
 
                         highlights = hit.get('highlight', {}).get('content', [])
@@ -790,15 +645,15 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         card = f"""
                         <div class="result-card">
                             <div class="result-header">
-                                <a class="file-title" data-path="{escaped_attr_path}" onclick="handleOpenFile(this)" title="Click to open file in Windows">{fname}</a>
+                                <a class="file-title" href="{open_file_url}" title="Click to open file natively on Windows desktop">{fname}</a>
                                 <div class="card-actions">
-                                    <button type="button" class="btn-open-file" data-path="{escaped_attr_path}" onclick="handleOpenFile(this)">↗️ Open File</button>
-                                    <button type="button" class="btn-open-explorer" data-path="{escaped_attr_path}" onclick="handleOpenExplorer(this)" title="Open folder in Windows File Explorer">📁 Explorer</button>
-                                    <button type="button" class="btn-open-folder" data-path="{escaped_attr_path}" onclick="handleOpenFolder(this)" title="Open folder in Directory Opus">📁 Opus</button>
+                                    <a class="btn-action btn-open-file" href="{open_file_url}" title="Open file natively in Word/Acrobat/Excel">↗️ Open File</a>
+                                    <a class="btn-action btn-open-explorer" href="{open_explorer_url}" title="Open folder natively in Windows File Explorer">📁 Explorer</a>
+                                    <a class="btn-action btn-open-folder" href="{open_opus_url}" title="Open folder natively in Directory Opus">📁 Opus</a>
                                     <span class="badge">{ftype}</span>
                                 </div>
                             </div>
-                            <div class="file-path" data-path="{escaped_attr_path}" onclick="handleOpenExplorer(this)" title="Click to open folder in Windows Explorer">📁 {escaped_attr_path}</div>
+                            <a class="file-path" href="{open_explorer_url}" title="Click to open folder natively in Windows File Explorer">📁 {escaped_display_path}</a>
                             <div class="snippet">{snippet_text}</div>
                         </div>
                         """
