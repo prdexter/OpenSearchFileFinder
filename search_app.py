@@ -1,9 +1,9 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Robust HTML data-path Attribute Handlers (Preserves exact Windows file paths without JS backslash stripping)
-- Windows Shell Launcher for Directory Opus (/api/open_folder executes 'start "" dopusrt.exe /cmd Go <file_path> NEW SELECT')
-- Native Windows File Launcher (/api/open_file opens Word, Acrobat, Excel, etc.)
+- Robust Windows Shell Execution ('start "" "<file_path>"' & 'start "" dopusrt.exe /cmd Go "<file_path>" NEW SELECT')
+- Live UI Toast Notifications on button click for immediate visual feedback
+- Robust HTML data-path Attribute Handlers
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
 - Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
 - Strict AND matching for multi-word search terms
@@ -230,6 +230,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .stats-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .stats { color: #6c757d; font-weight: 500; }
+        .toast-notification { position: fixed; bottom: 20px; right: 20px; background: #323232; color: white; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; z-index: 2000; }
         .index-badge { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; }
 
         .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
@@ -303,6 +304,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         {RESULTS}
     </div>
 
+    <div class="toast-notification" id="toastMsg"></div>
+
     <!-- Directory Tree Picker Modal -->
     <div id="treeModal" class="modal">
         <div class="modal-content">
@@ -330,31 +333,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             setInterval(checkStatus, 3000);
         });
 
+        function showToast(msg) {
+            const toast = document.getElementById('toastMsg');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
         async function handleOpenFile(element) {
             const filePath = element.getAttribute('data-path');
             if (!filePath) return;
+            showToast('Opening file in default app...');
             try {
                 const res = await fetch('/api/open_file?path=' + encodeURIComponent(filePath));
                 const data = await res.json();
                 if (data.status !== 'ok') {
-                    alert('Could not open file: ' + data.message);
+                    showToast('Could not open file: ' + data.message);
                 }
             } catch (e) {
-                alert('Error opening file: ' + e);
+                showToast('Error opening file: ' + e);
             }
         }
 
         async function handleOpenFolder(element) {
             const filePath = element.getAttribute('data-path');
             if (!filePath) return;
+            showToast('Opening folder in Directory Opus...');
             try {
                 const res = await fetch('/api/open_folder?path=' + encodeURIComponent(filePath));
                 const data = await res.json();
                 if (data.status !== 'ok') {
-                    alert('Could not open folder in Directory Opus: ' + data.message);
+                    showToast('Could not open folder: ' + data.message);
                 }
             } catch (e) {
-                alert('Error opening folder in Directory Opus: ' + e);
+                showToast('Error opening folder: ' + e);
             }
         }
 
@@ -589,7 +601,8 @@ class SearchHandler(SimpleHTTPRequestHandler):
             file_path = params.get('path', [''])[0]
             if file_path and os.path.exists(file_path):
                 try:
-                    os.startfile(file_path)
+                    norm_path = os.path.normpath(file_path)
+                    subprocess.Popen(f'start "" "{norm_path}"', shell=True)
                     self.send_json({"status": "ok", "message": "File opened successfully"})
                 except Exception as e:
                     self.send_json({"status": "error", "message": str(e)}, status=500)
@@ -611,7 +624,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         cmd = f'"{DOPUS_EXE}" /select "{norm_path}"'
                         subprocess.Popen(f'start "" {cmd}', shell=True)
                     else:
-                        subprocess.Popen(['explorer', '/select,', norm_path])
+                        subprocess.Popen(f'explorer /select,"{norm_path}"', shell=True)
 
                     self.send_json({"status": "ok", "message": "Folder opened in Directory Opus"})
                 except Exception as e:
