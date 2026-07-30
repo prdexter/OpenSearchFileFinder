@@ -1,7 +1,7 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Direct Directory Opus Launcher (/api/open_folder opens dopus.exe /select <file_path>)
+- Official Directory Opus Runtime Launcher (/api/open_folder executes dopusrt.exe /cmd Go <file_path> SELECT)
 - Native Windows File Launcher (/api/open_file opens Word, Acrobat, Excel, etc.)
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
 - Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
@@ -27,7 +27,8 @@ OPENSEARCH_PORT = 9200
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "indexer_config.json")
 KNOWN_EXTENSIONS = {'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'csv', 'md', 'rtf', 'pptx', 'ppt'}
 
-OPUS_EXE = r"C:\Program Files\GPSoftware\Directory Opus\dopus.exe"
+DOPUS_RT = r"C:\Program Files\GPSoftware\Directory Opus\dopusrt.exe"
+DOPUS_EXE = r"C:\Program Files\GPSoftware\Directory Opus\dopus.exe"
 
 # System folders to hide from folder tree picker
 HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata', 'appdata'}
@@ -339,7 +340,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             try {
                 await fetch('/api/open_folder?path=' + encodeURIComponent(filePath));
             } catch (e) {
-                alert('Error opening folder: ' + e);
+                alert('Error opening folder in Directory Opus: ' + e);
             }
         }
 
@@ -582,15 +583,18 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 self.send_json({"status": "error", "message": "File not found"}, status=404)
             return
 
-        # API: Open Containing Folder directly in Directory Opus (or Explorer)
+        # API: Open Containing Folder directly in Directory Opus (dopusrt.exe /cmd Go <file_path> SELECT)
         if parsed.path == '/api/open_folder':
             file_path = params.get('path', [''])[0]
             if file_path and os.path.exists(file_path):
                 try:
-                    if os.path.exists(OPUS_EXE):
-                        subprocess.Popen([OPUS_EXE, "/select", file_path])
+                    norm_path = os.path.normpath(file_path)
+                    if os.path.exists(DOPUS_RT):
+                        subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "SELECT"])
+                    elif os.path.exists(DOPUS_EXE):
+                        subprocess.Popen([DOPUS_EXE, "/select", norm_path])
                     else:
-                        subprocess.Popen(['explorer', '/select,', os.path.normpath(file_path)])
+                        subprocess.Popen(['explorer', '/select,', norm_path])
                     self.send_json({"status": "ok", "message": "Folder opened in Directory Opus"})
                 except Exception as e:
                     self.send_json({"status": "error", "message": str(e)}, status=500)
