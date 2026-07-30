@@ -35,7 +35,7 @@ DOPUS_RT = r"C:\Program Files\GPSoftware\Directory Opus\dopusrt.exe"
 DOPUS_EXE = r"C:\Program Files\GPSoftware\Directory Opus\dopus.exe"
 
 # System folders to hide from folder tree picker
-HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata', 'appdata'}
+HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata', 'appdata', 'deidentifier', 'identified'}
 
 # Global variables to track active background indexer process
 INDEXER_PROCESS = None
@@ -495,11 +495,14 @@ class SearchHandler(SimpleHTTPRequestHandler):
             if file_path:
                 img_data, content_type = get_thumbnail_bytes(file_path)
                 if img_data:
-                    self.send_response(200)
-                    self.send_header("Content-Type", content_type)
-                    self.send_header("Cache-Control", "public, max-age=86400")
-                    self.end_headers()
-                    self.wfile.write(img_data)
+                    try:
+                        self.send_response(200)
+                        self.send_header("Content-Type", content_type)
+                        self.send_header("Cache-Control", "public, max-age=86400")
+                        self.end_headers()
+                        self.wfile.write(img_data)
+                    except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+                        pass
                     return
             self.send_response(404)
             self.end_headers()
