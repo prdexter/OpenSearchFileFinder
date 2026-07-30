@@ -1,7 +1,7 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Official Directory Opus Runtime Launcher (/api/open_folder executes dopusrt.exe /cmd Go <file_path> SELECT)
+- Directory Opus Lister Launcher (/api/open_folder executes dopusrt.exe /cmd Go <file_path> NEW SELECT)
 - Native Windows File Launcher (/api/open_file opens Word, Acrobat, Excel, etc.)
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
 - Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
@@ -583,14 +583,16 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 self.send_json({"status": "error", "message": "File not found"}, status=404)
             return
 
-        # API: Open Containing Folder directly in Directory Opus (dopusrt.exe /cmd Go <file_path> SELECT)
+        # API: Open Containing Folder directly in Directory Opus
         if parsed.path == '/api/open_folder':
             file_path = params.get('path', [''])[0]
             if file_path and os.path.exists(file_path):
                 try:
                     norm_path = os.path.normpath(file_path)
+                    
+                    # Force Directory Opus to open a NEW Lister and SELECT the file
                     if os.path.exists(DOPUS_RT):
-                        subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "SELECT"])
+                        subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "NEW", "SELECT"])
                     elif os.path.exists(DOPUS_EXE):
                         subprocess.Popen([DOPUS_EXE, "/select", norm_path])
                     else:
