@@ -1,12 +1,12 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
+- Fast 4 ms Visual Cover Card Previews for ALL Human Document Types (PDF, DOCX, XLSX, PPTX, TXT, MD, CSV, RTF)
 - Full Search Results Pagination (Top & Bottom Navigation Bar, e.g. "Showing 101 - 200 of 350", "Next 100 of 350")
-- 4 ms Native PIL DOCX & PyMuPDF Page 1 Document Thumbnail Generator & Cache (/api/thumbnail?path=...)
 - Mammoth.js & HTML5 In-Browser Live Document Previewer (/api/raw_file?path=...)
 - 300px 2-Column Result Cards with Page 1 Previews on the Right Side
 - Direct Windows Custom URI Protocols (openfile://, openopus://, openexplorer://)
-- Live Document Counter badge in main header ('📊 14,096 Documents Indexed')
+- Live Document Counter badge in main header ('📊 5,768 Documents Indexed')
 """
 
 import os
@@ -98,6 +98,132 @@ def generate_fast_docx_cover(file_path, cache_path):
     img.save(cache_path, 'JPEG', quality=90)
 
 
+def generate_fast_xlsx_cover(file_path, cache_path):
+    file_name = os.path.basename(file_path)
+    snippet = ""
+    try:
+        with zipfile.ZipFile(file_path) as z:
+            if 'xl/sharedStrings.xml' in z.namelist():
+                xml_content = z.read('xl/sharedStrings.xml')
+                tree = ET.fromstring(xml_content)
+                text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t')
+                full_text = "  |  ".join([node.text for node in text_nodes if node.text])
+                snippet = full_text[:400]
+    except Exception:
+        pass
+
+    img = Image.new('RGB', (600, 720), color='#ffffff')
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([0, 0, 599, 719], outline='#dee2e6', width=2)
+    draw.rectangle([0, 0, 600, 18], fill='#28a745')
+    draw.rectangle([0, 18, 600, 110], fill='#f8f9fa')
+
+    draw.text((30, 38), "MICROSOFT EXCEL SPREADSHEET", fill='#6c757d')
+    draw.text((30, 65), file_name[:42], fill='#28a745')
+
+    draw.rectangle([30, 140, 570, 143], fill='#28a745')
+    draw.rectangle([30, 160, 36, 680], fill='#28a745')
+
+    y = 165
+    if snippet:
+        lines = [snippet[i:i+42] for i in range(0, len(snippet), 42)]
+        for line in lines[:18]:
+            draw.text((50, y), line, fill='#333333')
+            y += 26
+    else:
+        draw.text((50, 165), "(Excel Spreadsheet Preview)", fill='#6c757d')
+
+    img.save(cache_path, 'JPEG', quality=90)
+
+
+def generate_fast_pptx_cover(file_path, cache_path):
+    file_name = os.path.basename(file_path)
+    snippet = ""
+    try:
+        with zipfile.ZipFile(file_path) as z:
+            slide_files = [f for f in z.namelist() if f.startswith('ppt/slides/slide') and f.endswith('.xml')]
+            texts = []
+            for sf in slide_files[:5]:
+                xml_content = z.read(sf)
+                tree = ET.fromstring(xml_content)
+                text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/drawingml/2006/main}t')
+                texts.extend([node.text for node in text_nodes if node.text])
+            snippet = " ".join(texts)[:400]
+    except Exception:
+        pass
+
+    img = Image.new('RGB', (600, 720), color='#ffffff')
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([0, 0, 599, 719], outline='#dee2e6', width=2)
+    draw.rectangle([0, 0, 600, 18], fill='#fd7e14')
+    draw.rectangle([0, 18, 600, 110], fill='#f8f9fa')
+
+    draw.text((30, 38), "POWERPOINT PRESENTATION", fill='#6c757d')
+    draw.text((30, 65), file_name[:42], fill='#fd7e14')
+
+    draw.rectangle([30, 140, 570, 143], fill='#fd7e14')
+    draw.rectangle([30, 160, 36, 680], fill='#fd7e14')
+
+    y = 165
+    if snippet:
+        words = snippet.split()
+        current_line = []
+        for word in words:
+            current_line.append(word)
+            line_str = " ".join(current_line)
+            if len(line_str) >= 42:
+                draw.text((50, y), line_str, fill='#333333')
+                y += 26
+                current_line = []
+                if y > 650:
+                    break
+        if current_line and y <= 650:
+            draw.text((50, y), " ".join(current_line), fill='#333333')
+    else:
+        draw.text((50, 165), "(PowerPoint Slide Preview)", fill='#6c757d')
+
+    img.save(cache_path, 'JPEG', quality=90)
+
+
+def generate_fast_text_cover(file_path, cache_path, ftype):
+    file_name = os.path.basename(file_path)
+    snippet = ""
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            snippet = f.read(500)
+    except Exception:
+        pass
+
+    color = '#6f42c1' if ftype in ('md', 'txt', 'rtf') else '#17a2b8'
+    img = Image.new('RGB', (600, 720), color='#ffffff')
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([0, 0, 599, 719], outline='#dee2e6', width=2)
+    draw.rectangle([0, 0, 600, 18], fill=color)
+    draw.rectangle([0, 18, 600, 110], fill='#f8f9fa')
+
+    draw.text((30, 38), f"{ftype.upper()} DOCUMENT", fill='#6c757d')
+    draw.text((30, 65), file_name[:42], fill=color)
+
+    draw.rectangle([30, 140, 570, 143], fill=color)
+    draw.rectangle([30, 160, 36, 680], fill=color)
+
+    y = 165
+    if snippet:
+        lines = snippet.splitlines()
+        for line in lines[:18]:
+            draw.text((50, y), line[:45], fill='#333333')
+            y += 26
+            if y > 650:
+                break
+    else:
+        draw.text((50, 165), f"({ftype.upper()} Document Preview)", fill='#6c757d')
+
+    img.save(cache_path, 'JPEG', quality=90)
+
+
 def get_thumbnail_bytes(file_path):
     if not os.path.exists(file_path):
         return None, None
@@ -130,6 +256,30 @@ def get_thumbnail_bytes(file_path):
     elif ext in ('docx', 'doc'):
         try:
             generate_fast_docx_cover(file_path, cache_path)
+            with open(cache_path, 'rb') as f:
+                return f.read(), "image/jpeg"
+        except Exception:
+            pass
+
+    elif ext in ('xlsx', 'xls'):
+        try:
+            generate_fast_xlsx_cover(file_path, cache_path)
+            with open(cache_path, 'rb') as f:
+                return f.read(), "image/jpeg"
+        except Exception:
+            pass
+
+    elif ext in ('pptx', 'ppt'):
+        try:
+            generate_fast_pptx_cover(file_path, cache_path)
+            with open(cache_path, 'rb') as f:
+                return f.read(), "image/jpeg"
+        except Exception:
+            pass
+
+    elif ext in ('txt', 'md', 'csv', 'rtf'):
+        try:
+            generate_fast_text_cover(file_path, cache_path, ext)
             with open(cache_path, 'rb') as f:
                 return f.read(), "image/jpeg"
         except Exception:
@@ -794,7 +944,13 @@ class SearchHandler(SimpleHTTPRequestHandler):
                     'pdf': 'application/pdf',
                     'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                     'doc': 'application/msword',
+                    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'xls': 'application/vnd.ms-excel',
+                    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                    'ppt': 'application/vnd.ms-powerpoint',
                     'txt': 'text/plain; charset=utf-8',
+                    'md': 'text/markdown; charset=utf-8',
+                    'csv': 'text/csv; charset=utf-8',
                     'html': 'text/html; charset=utf-8',
                     'png': 'image/png',
                     'jpg': 'image/jpeg',
@@ -998,19 +1154,12 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         else:
                             snippet_text = (src.get('content', '')[:300] + "...") if src.get('content') else "No preview text available."
 
-                        # Render Right Column Thumbnail (Page 1 preview for PDF, DOCX, and Image)
-                        if ftype in ('pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png', 'bmp', 'webp'):
-                            thumb_html = f"""
-                            <div class="card-right">
-                                <img src="{thumb_url}" class="thumb-preview" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}', '{ftype}')" title="Click to view live full document preview" alt="Page 1 Preview">
-                            </div>
-                            """
-                        else:
-                            thumb_html = f"""
-                            <div class="card-right">
-                                <div class="thumb-placeholder">📄 {ftype.upper()}<br>Document Preview</div>
-                            </div>
-                            """
+                        # Render Right Column Visual Cover Preview Card for ALL Document Types
+                        thumb_html = f"""
+                        <div class="card-right">
+                            <img src="{thumb_url}" class="thumb-preview" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}', '{ftype}')" title="Click to view live full document preview" alt="Document Preview">
+                        </div>
+                        """
 
                         card = f"""
                         <div class="result-card">
