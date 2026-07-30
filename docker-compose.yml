@@ -9,7 +9,7 @@ services:
       - node.name=opensearch-node
       - discovery.type=single-node
       - bootstrap.memory_lock=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
+      - "OPENSEARCH_JAVA_OPTS=-Xms8g -Xmx8g"
       - DISABLE_SECURITY_PLUGIN=true
     ulimits:
       memlock:
@@ -18,14 +18,13 @@ services:
       nofile:
         soft: 65536
         hard: 65536
-    volumes:
-      - opensearch-data:/usr/share/opensearch/data
     ports:
       - "9200:9200"
       - "9600:9600"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
     networks:
       - opensearch-net
-    restart: unless-stopped
 
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2.18.0
@@ -33,13 +32,12 @@ services:
     ports:
       - "5601:5601"
     environment:
-      - 'OPENSEARCH_HOSTS=["http://opensearch-node:9200"]'
-      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+      - OPENSEARCH_HOSTS=["http://opensearch-node:9200"]
+      - DISABLE_SECURITY_PLUGIN=true
     networks:
       - opensearch-net
     depends_on:
       - opensearch-node
-    restart: unless-stopped
 
 volumes:
   opensearch-data:
