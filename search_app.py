@@ -1,8 +1,9 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Direct Directory Opus GUI Launcher (/api/open_folder triggers os.startfile(folder_path) + dopusrt.exe Go PATH=... SELECT=...)
-- Direct Windows File Launcher (/api/open_file executes os.startfile(norm_path))
+- Windows File Explorer Launcher (/api/open_folder?explorer=1 executes 'explorer /select,<file_path>')
+- Directory Opus Launcher (/api/open_folder executes dopusrt.exe /cmd Go <file_path> NEW SELECT)
+- Native Windows File Launcher (/api/open_file executes os.startfile(norm_path))
 - Live UI Toast Notifications on button click for immediate visual feedback
 - Robust HTML data-path Attribute Handlers
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
@@ -242,6 +243,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .card-actions { display: flex; align-items: center; gap: 8px; }
         .btn-open-file { background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
         .btn-open-file:hover { background-color: #0056b3; }
+        .btn-open-explorer { background-color: #17a2b8; color: white; border: none; padding: 6px 10px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .btn-open-explorer:hover { background-color: #138496; }
         .btn-open-folder { background-color: #f8f9fa; color: #495057; border: 1px solid #ced4da; padding: 6px 10px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
         .btn-open-folder:hover { background-color: #e2e6ea; }
 
@@ -353,6 +356,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }
             } catch (e) {
                 showToast('Error opening file: ' + e);
+            }
+        }
+
+        async function handleOpenExplorer(element) {
+            const filePath = element.getAttribute('data-path');
+            if (!filePath) return;
+            showToast('Opening folder in Windows Explorer...');
+            try {
+                const res = await fetch('/api/open_folder?explorer=1&path=' + encodeURIComponent(filePath));
+                const data = await res.json();
+                if (data.status !== 'ok') {
+                    showToast('Could not open Explorer: ' + data.message);
+                }
+            } catch (e) {
+                showToast('Error opening Explorer: ' + e);
             }
         }
 
@@ -611,34 +629,28 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 self.send_json({"status": "error", "message": f"File not found: {file_path}"}, status=404)
             return
 
-        # API: Open Containing Folder directly in Directory Opus
+        # API: Open Containing Folder directly in Windows File Explorer or Directory Opus
         if parsed.path == '/api/open_folder':
             file_path = params.get('path', [''])[0]
+            force_explorer = params.get('explorer', ['0'])[0] == '1'
+
             if file_path and os.path.exists(file_path):
                 try:
                     norm_path = os.path.normpath(file_path)
-                    folder_path = norm_path if os.path.isdir(norm_path) else os.path.dirname(norm_path)
-                    file_name = "" if os.path.isdir(norm_path) else os.path.basename(norm_path)
-
-                    # 1. Bring Directory Opus window to foreground on screen via os.startfile
-                    try:
-                        os.startfile(folder_path)
-                    except Exception:
-                        pass
-                        
-                    # 2. Select file inside Directory Opus Lister
-                    if file_name and os.path.exists(DOPUS_RT):
-                        try:
-                            subprocess.Popen([DOPUS_RT, "/cmd", "Go", f'PATH={folder_path}', f'SELECT={file_name}'])
-                        except Exception:
-                            pass
-                    elif file_name and os.path.exists(DOPUS_EXE):
-                        try:
+                    
+                    if force_explorer:
+                        # Direct Windows Explorer launch with file selected
+                        subprocess.Popen(['explorer', '/select,', norm_path])
+                        self.send_json({"status": "ok", "message": "Folder opened in Windows Explorer"})
+                    else:
+                        # Try Directory Opus first
+                        if os.path.exists(DOPUS_RT):
+                            subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "NEW", "SELECT"])
+                        elif os.path.exists(DOPUS_EXE):
                             subprocess.Popen([DOPUS_EXE, "/select", norm_path])
-                        except Exception:
-                            pass
-
-                    self.send_json({"status": "ok", "message": "Folder opened in Directory Opus"})
+                        else:
+                            subprocess.Popen(['explorer', '/select,', norm_path])
+                        self.send_json({"status": "ok", "message": "Folder opened"})
                 except Exception as e:
                     self.send_json({"status": "error", "message": str(e)}, status=500)
             else:
@@ -727,11 +739,12 @@ class SearchHandler(SimpleHTTPRequestHandler):
                                 <a class="file-title" data-path="{escaped_attr_path}" onclick="handleOpenFile(this)" title="Click to open file in Windows">{fname}</a>
                                 <div class="card-actions">
                                     <button type="button" class="btn-open-file" data-path="{escaped_attr_path}" onclick="handleOpenFile(this)">↗️ Open File</button>
-                                    <button type="button" class="btn-open-folder" data-path="{escaped_attr_path}" onclick="handleOpenFolder(this)" title="Open containing folder in Directory Opus">📁 Opus</button>
+                                    <button type="button" class="btn-open-explorer" data-path="{escaped_attr_path}" onclick="handleOpenExplorer(this)" title="Open folder in Windows File Explorer">📁 Explorer</button>
+                                    <button type="button" class="btn-open-folder" data-path="{escaped_attr_path}" onclick="handleOpenFolder(this)" title="Open folder in Directory Opus">📁 Opus</button>
                                     <span class="badge">{ftype}</span>
                                 </div>
                             </div>
-                            <div class="file-path" data-path="{escaped_attr_path}" onclick="handleOpenFolder(this)" title="Click to open folder in Directory Opus">📁 {escaped_attr_path}</div>
+                            <div class="file-path" data-path="{escaped_attr_path}" onclick="handleOpenExplorer(this)" title="Click to open folder in Windows Explorer">📁 {escaped_attr_path}</div>
                             <div class="snippet">{snippet_text}</div>
                         </div>
                         """
