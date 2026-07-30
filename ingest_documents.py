@@ -44,7 +44,7 @@ DEFAULT_EXCLUDE_DIRS = {
     '__pycache__', '.git', '.svn', 'node_modules', '.venv', 'venv',
     '.dropbox.cache', 'dropboxbackup', '.cache', 'appdata',
     r'd:\active research\deidentifier\identified', r'deidentifier\identified',
-    'deidentifier', 'identified'
+    'deidentifier', 'identified', 'new topic1 - copy'
 }
 
 # File extensions to strictly SKIP

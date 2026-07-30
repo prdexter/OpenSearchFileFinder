@@ -41,7 +41,7 @@ DOPUS_RT = r"C:\Program Files\GPSoftware\Directory Opus\dopusrt.exe"
 DOPUS_EXE = r"C:\Program Files\GPSoftware\Directory Opus\dopus.exe"
 
 # System folders to hide from folder tree picker
-HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata', 'appdata', 'deidentifier', 'identified'}
+HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata', 'appdata', 'deidentifier', 'identified', 'new topic1 - copy'}
 
 # Global variables to track active background indexer process
 INDEXER_PROCESS = None
@@ -311,7 +311,7 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance", page: int = 1
     return query_body
 
 
-HTML_TEMPLATE = """<!DOCTYPE html>
+HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
