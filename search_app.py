@@ -1,29 +1,85 @@
 """
-Dedicated Local Web Search Interface for OpenSearch.
-Includes smart extension parsing (pdf, docx, xlsx, txt, md, pptx) AND sorting options
-(Relevance, Newest First, Oldest First, File Name A-Z, File Size Largest First).
+Dedicated Local Web Search Interface & Index Manager for OpenSearch.
+Includes:
+- Interactive Directory Tree Picker (with drive & folder checkboxes)
+- Smart extension parsing (pdf, docx, xlsx, txt, md, pptx)
+- Custom sorting (Relevance, Date, Name, Size)
+- Live indexing status trigger
 """
 
 import os
 import re
 import json
+import string
+import threading
+import subprocess
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
+from pathlib import Path
 from opensearchpy import OpenSearch
 
 OPENSEARCH_HOST = "localhost"
 OPENSEARCH_PORT = 9200
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "indexer_config.json")
 KNOWN_EXTENSIONS = {'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'csv', 'md', 'rtf', 'pptx', 'ppt'}
+
+# System folders to hide from folder tree picker
+HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata', 'appdata'}
 
 
 def get_client():
     return OpenSearch(hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}], use_ssl=False)
 
 
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"selected_directories": [r"D:\Active research", r"C:\Users\Paul Dexter\Documents"]}
+
+
+def save_config(cfg):
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, indent=2)
+
+
+def get_available_drives():
+    drives = []
+    for letter in string.ascii_uppercase:
+        drive_path = f"{letter}:\\"
+        if os.path.exists(drive_path):
+            drives.append(drive_path)
+    return drives
+
+
+def list_subdirectories(parent_path: str):
+    subdirs = []
+    if not parent_path or not os.path.exists(parent_path):
+        return subdirs
+
+    try:
+        with os.scandir(parent_path) as entries:
+            for entry in entries:
+                if entry.is_dir(follow_symlinks=False):
+                    name_lower = entry.name.lower()
+                    if name_lower not in HIDDEN_DIRS and not name_lower.startswith('.'):
+                        subdirs.append({
+                            "name": entry.name,
+                            "path": entry.path
+                        })
+    except PermissionError:
+        pass
+    except Exception:
+        pass
+        
+    subdirs.sort(key=lambda x: x["name"].lower())
+    return subdirs
+
+
 def parse_smart_query(user_query: str, sort_by: str = "relevance"):
-    """
-    Parses plain search queries and applies selected sort order.
-    """
     tokens = user_query.strip().split()
     file_types = []
     text_terms = []
@@ -55,7 +111,6 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance"):
     else:
         query_body = {"query": {"bool": {"must": must_conditions}}}
 
-    # Apply sorting options
     if sort_by == "date_desc":
         query_body["sort"] = [{"modified_date": {"order": "desc"}}]
     elif sort_by == "date_asc":
@@ -65,7 +120,6 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance"):
     elif sort_by == "size_desc":
         query_body["sort"] = [{"file_size": {"order": "desc"}}]
     else:
-        # Default: Best Match / Relevance
         if must_conditions and text_terms:
             query_body["sort"] = [{"_score": {"order": "desc"}}]
         else:
@@ -86,16 +140,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>OpenSearch File Finder</title>
+    <title>OpenSearch File Finder & Indexer</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1100px; margin: 0 auto; }
-        .header { text-align: center; margin-bottom: 25px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 15px; }
+        .header-title h2 { margin: 0; font-size: 24px; color: #007bff; }
+        .header-title p { margin: 4px 0 0 0; color: #6c757d; font-size: 14px; }
+        .btn-settings { background-color: #6c757d; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .btn-settings:hover { background-color: #5a6268; }
+
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
         input[type="text"] { flex: 1; padding: 14px; font-size: 16px; border: 2px solid #ced4da; border-radius: 6px; }
         select { padding: 14px; font-size: 15px; border: 2px solid #ced4da; border-radius: 6px; background: white; cursor: pointer; }
-        button { padding: 14px 28px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
+        .btn-search { padding: 14px 28px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-search:hover { background-color: #0056b3; }
+
         .stats { margin-bottom: 15px; color: #6c757d; font-weight: 500; }
         .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .result-header { display: flex; justify-content: space-between; align-items: center; }
@@ -104,14 +164,36 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .file-path { color: #6c757d; font-size: 13px; margin: 4px 0 10px 0; word-break: break-all; }
         .snippet { background: #f8f9fa; padding: 10px; border-left: 4px solid #007bff; border-radius: 4px; font-size: 14px; color: #495057; line-height: 1.5; }
         mark { background-color: #ffe066; padding: 2px 4px; border-radius: 3px; font-weight: bold; }
+
+        /* Modal Styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 40px auto; padding: 25px; border-radius: 8px; width: 650px; max-width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dee2e6; padding-bottom: 12px; margin-bottom: 15px; }
+        .modal-header h3 { margin: 0; }
+        .close { cursor: pointer; font-size: 24px; color: #aaa; }
+        .close:hover { color: #000; }
+
+        .tree-container { flex: 1; overflow-y: auto; border: 1px solid #ced4da; border-radius: 6px; padding: 12px; font-family: consolas, monospace; font-size: 14px; background: #fafafa; }
+        .tree-item { margin: 4px 0; }
+        .tree-toggle { cursor: pointer; display: inline-block; width: 18px; text-align: center; font-weight: bold; color: #007bff; user-select: none; }
+        .tree-children { margin-left: 20px; display: none; }
+        .tree-children.open { display: block; }
+        
+        .modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; border-top: 1px solid #dee2e6; padding-top: 15px; }
+        .btn-save { background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-save:hover { background-color: #218838; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h2>🔍 OpenSearch File Finder</h2>
-            <p>Smart search across your documents with custom sorting and automatic file type parsing (<code>pdf</code>, <code>docx</code>, <code>xlsx</code>, <code>md</code>).</p>
+            <div class="header-title">
+                <h2>🔍 OpenSearch File Finder</h2>
+                <p>Type extension names (e.g. <code>pdf</code>, <code>docx</code>, <code>xlsx</code>, <code>md</code>) directly into the search bar!</p>
+            </div>
+            <button class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
         </div>
+
         <form class="search-box" method="GET" action="/">
             <input type="text" name="q" value="{QUERY}" placeholder="Try: 'pdf patient', 'docx quality', 'xlsx', 'pathology'..." autofocus>
             <select name="sort" onchange="this.form.submit()">
@@ -121,11 +203,133 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <option value="name_asc" {SORT_NAME_ASC}>File Name (A - Z)</option>
                 <option value="size_desc" {SORT_SIZE_DESC}>File Size: Largest First</option>
             </select>
-            <button type="submit">Search</button>
+            <button type="submit" class="btn-search">Search</button>
         </form>
         <div class="stats">{STATS}</div>
         {RESULTS}
     </div>
+
+    <!-- Directory Tree Picker Modal -->
+    <div id="treeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📁 Select Directories to Index</h3>
+                <span class="close" onclick="closeTreeModal()">&times;</span>
+            </div>
+            <p style="font-size:13px; color:#6c757d; margin-top:0;">Check the folders you want OpenSearch to scan and index across your drives:</p>
+            <div class="tree-container" id="treeContainer">
+                Loading drive and directory tree...
+            </div>
+            <div class="modal-footer">
+                <span id="statusMsg" style="font-size:13px; font-weight:bold; color:#007bff;"></span>
+                <button class="btn-save" onclick="saveSelectedDirectories()">Save & Start Indexer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedPaths = new Set({SELECTED_JSON});
+
+        function openTreeModal() {
+            document.getElementById('treeModal').style.display = 'block';
+            loadDriveTree();
+        }
+
+        function closeTreeModal() {
+            document.getElementById('treeModal').style.display = 'none';
+        }
+
+        async function loadDriveTree() {
+            const container = document.getElementById('treeContainer');
+            container.innerHTML = '';
+
+            const res = await fetch('/api/drives');
+            const drives = await res.json();
+
+            for (const drive of drives) {
+                const driveItem = document.createElement('div');
+                driveItem.className = 'tree-item';
+
+                const isChecked = selectedPaths.has(drive) ? 'checked' : '';
+
+                driveItem.innerHTML = `
+                    <span class="tree-toggle" onclick="toggleFolder(this, '${escapePath(drive)}')">▶</span>
+                    <input type="checkbox" value="${escapePath(drive)}" ${isChecked} onchange="onCheckboxChange(this)">
+                    <strong>💻 ${drive}</strong>
+                    <div class="tree-children" id="child_${cleanId(drive)}"></div>
+                `;
+                container.appendChild(driveItem);
+            }
+        }
+
+        async function toggleFolder(element, path) {
+            const childrenDiv = document.getElementById('child_' + cleanId(path));
+            if (element.innerText === '▶') {
+                element.innerText = '▼';
+                childrenDiv.classList.add('open');
+
+                if (childrenDiv.children.length === 0) {
+                    const res = await fetch('/api/ls?path=' + encodeURIComponent(path));
+                    const subdirs = await res.json();
+
+                    if (subdirs.length === 0) {
+                        childrenDiv.innerHTML = '<div style="margin-left:20px; color:#aaa; font-style:italic;">(Empty or No subfolders)</div>';
+                    } else {
+                        for (const sub of subdirs) {
+                            const item = document.createElement('div');
+                            item.className = 'tree-item';
+                            const isChecked = selectedPaths.has(sub.path) ? 'checked' : '';
+
+                            item.innerHTML = `
+                                <span class="tree-toggle" onclick="toggleFolder(this, '${escapePath(sub.path)}')">▶</span>
+                                <input type="checkbox" value="${escapePath(sub.path)}" ${isChecked} onchange="onCheckboxChange(this)">
+                                📁 ${sub.name}
+                                <div class="tree-children" id="child_${cleanId(sub.path)}"></div>
+                            `;
+                            childrenDiv.appendChild(item);
+                        }
+                    }
+                }
+            } else {
+                element.innerText = '▶';
+                childrenDiv.classList.remove('open');
+            }
+        }
+
+        function onCheckboxChange(cb) {
+            if (cb.checked) {
+                selectedPaths.add(cb.value);
+            } else {
+                selectedPaths.delete(cb.value);
+            }
+        }
+
+        function escapePath(p) {
+            return p.replace(/\\\\/g, '\\\\');
+        }
+
+        function cleanId(p) {
+            return p.replace(/[^a-zA-Z0-9]/g, '_');
+        }
+
+        async function saveSelectedDirectories() {
+            const arr = Array.from(selectedPaths);
+            const statusMsg = document.getElementById('statusMsg');
+            statusMsg.innerText = 'Saving configuration & starting indexer...';
+
+            await fetch('/api/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({selected_directories: arr})
+            });
+
+            statusMsg.innerText = '✓ Indexer triggered in background!';
+            setTimeout(() => {
+                closeTreeModal();
+                statusMsg.innerText = '';
+            }, 1500);
+        }
+    </script>
 </body>
 </html>
 """
@@ -135,13 +339,36 @@ class SearchHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
+
+        # API: Available Drives
+        if parsed.path == '/api/drives':
+            drives = get_available_drives()
+            self.send_json(drives)
+            return
+
+        # API: Subdirectories
+        if parsed.path == '/api/ls':
+            parent_path = params.get('path', [''])[0]
+            subdirs = list_subdirectories(parent_path)
+            self.send_json(subdirs)
+            return
+
+        # API: Current Config
+        if parsed.path == '/api/config':
+            cfg = load_config()
+            self.send_json(cfg)
+            return
+
+        # Render Main Search HTML
         query_str = params.get('q', [''])[0].strip()
         sort_by = params.get('sort', ['relevance'])[0].strip()
+
+        cfg = load_config()
+        selected_json = json.dumps(cfg.get('selected_directories', []))
 
         stats_html = ""
         results_html = ""
 
-        # Map selected sort state
         sort_state = {
             "SORT_RELEVANCE": "selected" if sort_by == "relevance" else "",
             "SORT_DATE_DESC": "selected" if sort_by == "date_desc" else "",
@@ -193,7 +420,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
             except Exception as e:
                 results_html = f"<div class='result-card' style='color:red;'>Error executing search: {e}</div>"
 
-        html_out = HTML_TEMPLATE.replace("{QUERY}", query_str).replace("{STATS}", stats_html).replace("{RESULTS}", results_html)
+        html_out = HTML_TEMPLATE.replace("{QUERY}", query_str).replace("{STATS}", stats_html).replace("{RESULTS}", results_html).replace("{SELECTED_JSON}", selected_json)
         for key, val in sort_state.items():
             html_out = html_out.replace(f"{{{key}}}", val)
 
@@ -202,12 +429,43 @@ class SearchHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(html_out.encode('utf-8'))
 
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path == '/api/config':
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                save_config(data)
+
+                # Trigger ingest_documents.py in background thread
+                dirs = data.get("selected_directories", [])
+                if dirs:
+                    def run_ingest():
+                        cmd = [sys.executable, "ingest_documents.py", "--dir"] + dirs
+                        subprocess.run(cmd, cwd=os.path.dirname(__file__))
+
+                    t = threading.Thread(target=run_ingest)
+                    t.daemon = True
+                    t.start()
+
+                self.send_json({"status": "ok", "message": "Saved and indexing started!"})
+            except Exception as e:
+                self.send_json({"status": "error", "message": str(e)}, status=500)
+
+    def send_json(self, data, status=200):
+        self.send_response(status)
+        self.send_header("Content-Type", "json/application; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(json.dumps(data).encode('utf-8'))
+
 
 def main():
     server = HTTPServer(('localhost', 8080), SearchHandler)
-    print("[+] OpenSearch Smart Search Server running at http://localhost:8080")
+    print("[+] OpenSearch Smart Search & Directory Tree Server running at http://localhost:8080")
     server.serve_forever()
 
 
 if __name__ == "__main__":
+    import sys
     main()
