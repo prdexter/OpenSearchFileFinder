@@ -1,7 +1,8 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
-- Robust Interactive Shell Launcher for Directory Opus (/api/open_folder executes 'start "" dopusrt.exe /cmd Go <file_path> NEW SELECT')
+- Robust HTML data-path Attribute Handlers (Preserves exact Windows file paths without JS backslash stripping)
+- Windows Shell Launcher for Directory Opus (/api/open_folder executes 'start "" dopusrt.exe /cmd Go <file_path> NEW SELECT')
 - Native Windows File Launcher (/api/open_file opens Word, Acrobat, Excel, etc.)
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
 - Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
@@ -15,6 +16,7 @@ import re
 import json
 import string
 import sys
+import html
 import threading
 import subprocess
 from http.server import HTTPServer, SimpleHTTPRequestHandler
@@ -328,7 +330,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             setInterval(checkStatus, 3000);
         });
 
-        async function openFile(filePath) {
+        async function handleOpenFile(element) {
+            const filePath = element.getAttribute('data-path');
+            if (!filePath) return;
             try {
                 const res = await fetch('/api/open_file?path=' + encodeURIComponent(filePath));
                 const data = await res.json();
@@ -340,7 +344,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }
         }
 
-        async function openFolder(filePath) {
+        async function handleOpenFolder(element) {
+            const filePath = element.getAttribute('data-path');
+            if (!filePath) return;
             try {
                 const res = await fetch('/api/open_folder?path=' + encodeURIComponent(filePath));
                 const data = await res.json();
@@ -679,12 +685,10 @@ class SearchHandler(SimpleHTTPRequestHandler):
                     cards = []
                     for hit in hits:
                         src = hit['_source']
-                        fname = src.get('file_name', 'Unnamed File')
+                        fname = html.escape(src.get('file_name', 'Unnamed File'))
                         fpath = src.get('file_path', '')
+                        escaped_attr_path = html.escape(fpath)
                         ftype = src.get('file_type', 'doc')
-                        
-                        # Escape single quotes and backslashes for JS inline call
-                        escaped_path = fpath.replace('\\', '\\\\').replace("'", "\\'")
 
                         highlights = hit.get('highlight', {}).get('content', [])
                         if highlights:
@@ -695,14 +699,14 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         card = f"""
                         <div class="result-card">
                             <div class="result-header">
-                                <a class="file-title" onclick="openFile('{escaped_path}')" title="Click to open file in Windows">{fname}</a>
+                                <a class="file-title" data-path="{escaped_attr_path}" onclick="handleOpenFile(this)" title="Click to open file in Windows">{fname}</a>
                                 <div class="card-actions">
-                                    <button type="button" class="btn-open-file" onclick="openFile('{escaped_path}')">↗️ Open File</button>
-                                    <button type="button" class="btn-open-folder" onclick="openFolder('{escaped_path}')" title="Open containing folder in Directory Opus">📁 Opus</button>
+                                    <button type="button" class="btn-open-file" data-path="{escaped_attr_path}" onclick="handleOpenFile(this)">↗️ Open File</button>
+                                    <button type="button" class="btn-open-folder" data-path="{escaped_attr_path}" onclick="handleOpenFolder(this)" title="Open containing folder in Directory Opus">📁 Opus</button>
                                     <span class="badge">{ftype}</span>
                                 </div>
                             </div>
-                            <div class="file-path" onclick="openFolder('{escaped_path}')" title="Click to open folder in Directory Opus">📁 {fpath}</div>
+                            <div class="file-path" data-path="{escaped_attr_path}" onclick="handleOpenFolder(this)" title="Click to open folder in Directory Opus">📁 {escaped_attr_path}</div>
                             <div class="snippet">{snippet_text}</div>
                         </div>
                         """
