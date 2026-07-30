@@ -468,6 +468,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <title>OpenSearch File Finder & Indexer</title>
     <!-- Mammoth.js for client-side Word DOCX rendering -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+    <!-- SheetJS for client-side Excel XLSX/XLS/CSV rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1150px; margin: 0 auto; }
@@ -672,6 +674,30 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                     }
                 } catch (e) {
                     container.innerHTML = '<div style="color:red; padding:20px;">Error rendering DOCX document: ' + e + '</div>';
+                }
+            } else if (ftype === 'xlsx' || ftype === 'xls' || ftype === 'csv') {
+                try {
+                    const response = await fetch(rawUrl);
+                    const arrayBuffer = await response.arrayBuffer();
+                    if (window.XLSX) {
+                        const workbook = XLSX.read(arrayBuffer, {type: 'array'});
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const htmlTable = XLSX.utils.sheet_to_html(worksheet);
+                        container.innerHTML = '<div style="background:white; padding:25px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); overflow:auto; max-height:100%;"><h4 style="margin-top:0; color:#28a745;">📊 Sheet: ' + firstSheetName + '</h4><style>table { border-collapse: collapse; width:100%; font-size:14px; } td, th { border: 1px solid #dee2e6; padding: 8px 12px; } tr:nth-child(even) { background-color: #f8f9fa; } tr:first-child { background-color: #e9ecef; font-weight: bold; }</style>' + htmlTable + '</div>';
+                    } else {
+                        container.innerHTML = '<div style="color:red; padding:20px;">SheetJS library not loaded</div>';
+                    }
+                } catch (e) {
+                    container.innerHTML = '<div style="color:red; padding:20px;">Error rendering Excel spreadsheet: ' + e + '</div>';
+                }
+            } else if (ftype === 'txt' || ftype === 'md' || ftype === 'rtf') {
+                try {
+                    const response = await fetch(rawUrl);
+                    const text = await response.text();
+                    container.innerHTML = '<div style="max-width:850px; margin:0 auto; background:white; padding:30px; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,0.1); line-height:1.6; font-family:monospace; white-space:pre-wrap;">' + text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+                } catch (e) {
+                    container.innerHTML = '<div style="color:red; padding:20px;">Error rendering text document: ' + e + '</div>';
                 }
             } else {
                 container.innerHTML = '<iframe src="' + rawUrl + '" style="width:100%; height:100%; border:none;"></iframe>';
