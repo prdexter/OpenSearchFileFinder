@@ -1,6 +1,7 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
+- Direct '⚡ Start Indexing' trigger button in the main header
 - Interactive Directory Tree Picker with Tri-State Indeterminate Checkboxes (half-filled parent boxes)
 - Automatic initial checking of configured directories from indexer_config.json
 - Smart extension parsing (pdf, docx, xlsx, txt, md, pptx)
@@ -148,8 +149,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 15px; }
         .header-title h2 { margin: 0; font-size: 24px; color: #007bff; }
         .header-title p { margin: 4px 0 0 0; color: #6c757d; font-size: 14px; }
+        .header-buttons { display: flex; gap: 10px; align-items: center; }
         .btn-settings { background-color: #6c757d; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
         .btn-settings:hover { background-color: #5a6268; }
+        .btn-index { background-color: #28a745; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .btn-index:hover { background-color: #218838; }
 
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
         input[type="text"] { flex: 1; padding: 14px; font-size: 16px; border: 2px solid #ced4da; border-radius: 6px; }
@@ -157,7 +161,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .btn-search { padding: 14px 28px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .btn-search:hover { background-color: #0056b3; }
 
-        .stats { margin-bottom: 15px; color: #6c757d; font-weight: 500; }
+        .stats-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .stats { color: #6c757d; font-weight: 500; }
+        .index-badge { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; }
+
         .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .result-header { display: flex; justify-content: space-between; align-items: center; }
         .file-title { font-weight: bold; font-size: 17px; color: #007bff; text-decoration: none; }
@@ -193,7 +200,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <h2>🔍 OpenSearch File Finder</h2>
                 <p>Type extension names (e.g. <code>pdf</code>, <code>docx</code>, <code>xlsx</code>, <code>md</code>) directly into the search bar!</p>
             </div>
-            <button class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
+            <div class="header-buttons">
+                <button class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
+                <button class="btn-index" onclick="triggerIndexing()">⚡ Start Indexing</button>
+            </div>
         </div>
 
         <form class="search-box" method="GET" action="/">
@@ -207,7 +217,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </select>
             <button type="submit" class="btn-search">Search</button>
         </form>
-        <div class="stats">{STATS}</div>
+
+        <div class="stats-bar">
+            <div class="stats">{STATS}</div>
+            <div class="index-badge" id="indexStatusBadge">⚡ Indexing active in background...</div>
+        </div>
+
         {RESULTS}
     </div>
 
@@ -390,10 +405,38 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             });
 
             statusMsg.innerText = '✓ Indexer triggered in background!';
+            showIndexBadge();
             setTimeout(() => {
                 closeTreeModal();
                 statusMsg.innerText = '';
             }, 1500);
+        }
+
+        async function triggerIndexing() {
+            const badge = document.getElementById('indexStatusBadge');
+            badge.style.display = 'block';
+            badge.innerText = '⚡ Starting indexer...';
+
+            const cfgRes = await fetch('/api/config');
+            const cfg = await cfgRes.json();
+            const arr = cfg.selected_directories || [];
+
+            await fetch('/api/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({selected_directories: arr})
+            });
+
+            badge.innerText = '⚡ Indexing active in background...';
+            setTimeout(() => {
+                badge.style.display = 'none';
+            }, 5000);
+        }
+
+        function showIndexBadge() {
+            const badge = document.getElementById('indexStatusBadge');
+            badge.style.display = 'block';
+            setTimeout(() => { badge.style.display = 'none'; }, 5000);
         }
     </script>
 </body>
