@@ -1,12 +1,11 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
+- Full Boolean NOT support (e.g. 'quality NOT IUH', 'quality -IUH', 'quality NOT(IUH)')
 - Direct '⚡ Start Indexing' trigger button in the main header
-- Interactive Directory Tree Picker with Tri-State Indeterminate Checkboxes (half-filled parent boxes)
-- Automatic initial checking of configured directories from indexer_config.json
+- Interactive Directory Tree Picker with Tri-State Indeterminate Checkboxes
 - Smart extension parsing (pdf, docx, xlsx, txt, md, pptx)
 - Custom sorting (Relevance, Date, Name, Size)
-- Live background indexing pipeline trigger
 """
 
 import os
@@ -82,24 +81,58 @@ def list_subdirectories(parent_path: str):
 
 
 def parse_smart_query(user_query: str, sort_by: str = "relevance"):
-    tokens = user_query.strip().split()
+    """
+    Parses plain search queries with support for:
+    - File extensions (pdf, docx, xlsx, md)
+    - Boolean NOT operators ('NOT IUH', '-IUH', 'NOT(IUH)')
+    - Multi-word matching
+    """
+    raw_query = user_query.strip()
+    
+    # Normalize NOT(term) syntax to ' NOT term '
+    raw_query = re.sub(r'NOT\s*\(\s*([^)]+)\s*\)', r' NOT \1 ', raw_query, flags=re.IGNORECASE)
+    
+    tokens = raw_query.split()
     file_types = []
-    text_terms = []
+    must_terms = []
+    must_not_terms = []
 
-    for token in tokens:
+    skip_next = False
+    for i, token in enumerate(tokens):
+        if skip_next:
+            skip_next = False
+            continue
+
+        token_upper = token.upper()
+
+        # Handle NOT term syntax (e.g. 'NOT IUH')
+        if token_upper == 'NOT' or token_upper == 'AND NOT':
+            if i + 1 < len(tokens):
+                not_val = tokens[i + 1].strip('()')
+                if not_val:
+                    must_not_terms.append(not_val)
+                skip_next = True
+            continue
+
+        # Handle -term syntax (e.g. '-IUH')
+        if token.startswith('-') and len(token) > 1:
+            must_not_terms.append(token[1:].strip('()'))
+            continue
+
         clean_token = token.lower().lstrip('.')
         if clean_token in KNOWN_EXTENSIONS:
             file_types.append(clean_token)
         else:
-            text_terms.append(token)
+            must_terms.append(token)
 
     must_conditions = []
+    must_not_conditions = []
     
     if file_types:
         must_conditions.append({"terms": {"file_type": file_types}})
         
-    if text_terms:
-        search_text = " ".join(text_terms)
+    if must_terms:
+        search_text = " ".join(must_terms)
         must_conditions.append({
             "multi_match": {
                 "query": search_text,
@@ -107,11 +140,26 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance"):
                 "type": "best_fields"
             }
         })
-        
-    if not must_conditions:
+
+    if must_not_terms:
+        for not_term in must_not_terms:
+            must_not_conditions.append({
+                "multi_match": {
+                    "query": not_term,
+                    "fields": ["content", "file_name", "file_path"]
+                }
+            })
+
+    bool_query = {}
+    if must_conditions:
+        bool_query["must"] = must_conditions
+    if must_not_conditions:
+        bool_query["must_not"] = must_not_conditions
+
+    if not bool_query:
         query_body = {"query": {"match_all": {}}}
     else:
-        query_body = {"query": {"bool": {"must": must_conditions}}}
+        query_body = {"query": {"bool": bool_query}}
 
     if sort_by == "date_desc":
         query_body["sort"] = [{"modified_date": {"order": "desc"}}]
@@ -122,7 +170,7 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance"):
     elif sort_by == "size_desc":
         query_body["sort"] = [{"file_size": {"order": "desc"}}]
     else:
-        if must_conditions and text_terms:
+        if must_conditions and must_terms:
             query_body["sort"] = [{"_score": {"order": "desc"}}]
         else:
             query_body["sort"] = [{"modified_date": {"order": "desc"}}]
@@ -198,7 +246,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="header">
             <div class="header-title">
                 <h2>🔍 OpenSearch File Finder</h2>
-                <p>Type extension names (e.g. <code>pdf</code>, <code>docx</code>, <code>xlsx</code>, <code>md</code>) directly into the search bar!</p>
+                <p>Type extension names (e.g. <code>pdf</code>, <code>docx</code>, <code>xlsx</code>, <code>md</code>) and exclusion terms (e.g. <code>quality NOT IUH</code> or <code>quality -IUH</code>) directly into the search bar!</p>
             </div>
             <div class="header-buttons">
                 <button class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
@@ -207,7 +255,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <form class="search-box" method="GET" action="/">
-            <input type="text" name="q" value="{QUERY}" placeholder="Try: 'pdf patient', 'docx quality', 'xlsx', 'pathology'..." autofocus>
+            <input type="text" name="q" value="{QUERY}" placeholder="Try: 'quality NOT IUH', 'pdf patient -clinic', 'docx', 'pathology'..." autofocus>
             <select name="sort" onchange="this.form.submit()">
                 <option value="relevance" {SORT_RELEVANCE}>Best Match (Relevance)</option>
                 <option value="date_desc" {SORT_DATE_DESC}>Date: Newest First</option>
