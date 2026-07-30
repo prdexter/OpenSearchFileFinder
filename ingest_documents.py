@@ -43,7 +43,7 @@ DEFAULT_EXCLUDE_DIRS = {
     r'c:\windows', r'c:\program files', r'c:\program files (x86)',
     r'c:\programdata', r'$recycle.bin', r'system volume information',
     '__pycache__', '.git', '.svn', 'node_modules', '.venv', 'venv',
-    '.dropbox.cache', 'dropboxbackup', '.cache', 'appdata',
+    '.dropbox.cache', 'dropboxbackup', '.cache', 'appdata', '.gemini',
     r'd:\active research\deidentifier\identified', r'deidentifier\identified',
     'deidentifier', 'identified', 'new topic1 - copy'
 }
@@ -54,7 +54,7 @@ SKIP_EXTENSIONS = {
     '.zip', '.tar', '.gz', '.7z', '.rar', '.iso', '.obj', '.o', '.lib',
     '.pdb', '.dat', '.tmp', '.pyd', '.nupkg', '.cab', '.msi', '.lnk',
     '.cache', '.bak', '.ico', '.png', '.jpg', '.jpeg', '.gif', '.mp3', '.mp4',
-    '.ini', '.log', '.csv', '.tsv'
+    '.ini', '.log', '.csv', '.tsv', '.pb'
 }
 
 # Pure Human Document extensions (PDF, Word, Excel, Text, Markdown, PPT)

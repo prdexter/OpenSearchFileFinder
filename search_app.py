@@ -41,7 +41,7 @@ DOPUS_RT = r"C:\Program Files\GPSoftware\Directory Opus\dopusrt.exe"
 DOPUS_EXE = r"C:\Program Files\GPSoftware\Directory Opus\dopus.exe"
 
 # System folders to hide from folder tree picker
-HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata', 'appdata', 'deidentifier', 'identified', 'new topic1 - copy'}
+HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program files', 'program files (x86)', 'programdata', 'appdata', 'deidentifier', 'identified', 'new topic1 - copy', '.gemini'}
 
 # Global variables to track active background indexer process
 INDEXER_PROCESS = None
