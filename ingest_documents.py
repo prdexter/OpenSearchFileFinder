@@ -38,14 +38,20 @@ try:
 except ImportError:
     openpyxl = None
 
-# Default folders to skip
+# Fast Folder Exclusions (names & full paths)
+DEFAULT_EXCLUDE_NAMES = {
+    '__pycache__', '.git', '.svn', 'node_modules', '.venv', 'venv',
+    '.dropbox.cache', 'dropboxbackup', '.cache', 'appdata', '.gemini',
+    'deidentifier', 'identified', 'new topic1 - copy', 'build', 'dist',
+    'target', 'bin', 'obj', '.vs', '.idea', '.vscode', '.nuget', 'coverage',
+    '$recycle.bin', 'system volume information', 'windows', 'program files',
+    'program files (x86)', 'programdata'
+}
+
 DEFAULT_EXCLUDE_DIRS = {
     r'c:\windows', r'c:\program files', r'c:\program files (x86)',
     r'c:\programdata', r'$recycle.bin', r'system volume information',
-    '__pycache__', '.git', '.svn', 'node_modules', '.venv', 'venv',
-    '.dropbox.cache', 'dropboxbackup', '.cache', 'appdata', '.gemini',
-    r'd:\active research\deidentifier\identified', r'deidentifier\identified',
-    'deidentifier', 'identified', 'new topic1 - copy'
+    r'd:\active research\deidentifier\identified', r'deidentifier\identified'
 }
 
 # File extensions to strictly SKIP
@@ -54,7 +60,7 @@ SKIP_EXTENSIONS = {
     '.zip', '.tar', '.gz', '.7z', '.rar', '.iso', '.obj', '.o', '.lib',
     '.pdb', '.dat', '.tmp', '.pyd', '.nupkg', '.cab', '.msi', '.lnk',
     '.cache', '.bak', '.ico', '.png', '.jpg', '.jpeg', '.gif', '.mp3', '.mp4',
-    '.ini', '.log', '.csv', '.tsv', '.pb', '.pak'
+    '.ini', '.log', '.tsv', '.pb', '.pak'
 }
 
 # Pure Human Document extensions (PDF, Word, Excel, Text, Markdown, PPT)
@@ -269,9 +275,14 @@ def process_single_file(file_path: str, index_name: str) -> dict:
 
 
 def is_excluded_dir(dir_path: str) -> bool:
-    norm_path = dir_path.lower()
+    norm_path = dir_path.lower().replace('\\', '/')
+    dir_name = os.path.basename(dir_path).lower()
+    
+    if dir_name in DEFAULT_EXCLUDE_NAMES or dir_name.startswith('.'):
+        return True
+        
     for excl in DEFAULT_EXCLUDE_DIRS:
-        if excl in norm_path or norm_path.startswith(excl):
+        if excl in norm_path:
             return True
     return False
 
