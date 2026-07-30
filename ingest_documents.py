@@ -360,7 +360,7 @@ def main():
                 pass
 
     elapsed = time.time() - start_time
-    print(f"[✓] Ingestion complete! Total documents indexed: {total_indexed:,} in {elapsed:.2f} seconds.")
+    print(f"[+] Ingestion complete! Total documents indexed: {total_indexed:,} in {elapsed:.2f} seconds.")
 
 
 if __name__ == "__main__":
