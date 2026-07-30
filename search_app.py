@@ -1,9 +1,10 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
+- Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
 - Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
 - API endpoint /api/stop_indexing to safely terminate background indexing processes
-- Automatic background process status polling via /api/status
+- Automatic background process status & document count polling via /api/status
 - Strict AND matching for multi-word search terms
 - Full Boolean NOT support (e.g. 'quality NOT IUH', 'quality -IUH')
 - Interactive Directory Tree Picker with Tri-State Indeterminate Checkboxes
@@ -36,6 +37,17 @@ IS_INDEXING_RUNNING = False
 
 def get_client():
     return OpenSearch(hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}], use_ssl=False)
+
+
+def get_document_count():
+    try:
+        client = get_client()
+        if client.indices.exists(index="documents"):
+            res = client.count(index="documents")
+            return res.get('count', 0)
+    except Exception:
+        pass
+    return 0
 
 
 def load_config():
@@ -197,6 +209,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .header-title h2 { margin: 0; font-size: 24px; color: #007bff; }
         .header-title p { margin: 4px 0 0 0; color: #6c757d; font-size: 14px; }
         .header-buttons { display: flex; gap: 10px; align-items: center; }
+        .count-badge { background-color: #e3f2fd; color: #0d47a1; border: 1px solid #bbdefb; padding: 9px 15px; border-radius: 6px; font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
         .btn-settings { background-color: #6c757d; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
         .btn-settings:hover { background-color: #5a6268; }
         
@@ -251,6 +264,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <p>Type extension names (e.g. <code>pdf</code>, <code>docx</code>, <code>xlsx</code>, <code>md</code>) and exclusion terms (e.g. <code>quality NOT IUH</code>) directly into the search bar!</p>
             </div>
             <div class="header-buttons">
+                <div class="count-badge" id="docCountBadge">📊 Total Indexed: ...</div>
                 <button class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
                 <button class="btn-index" id="indexBtn" onclick="toggleIndexing()">⚡ Start Indexing</button>
             </div>
@@ -309,8 +323,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 const data = await res.json();
                 const btn = document.getElementById('indexBtn');
                 const badge = document.getElementById('indexStatusBadge');
+                const countBadge = document.getElementById('docCountBadge');
 
                 isIndexing = data.indexing_running;
+                if (data.total_docs !== undefined) {
+                    countBadge.innerText = '📊 Total Indexed: ' + data.total_docs.toLocaleString() + ' docs';
+                }
 
                 if (isIndexing) {
                     btn.className = 'btn-index running';
@@ -525,9 +543,13 @@ class SearchHandler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
 
-        # API: Indexing Status
+        # API: Indexing Status & Total Count
         if parsed.path == '/api/status':
-            self.send_json({"indexing_running": IS_INDEXING_RUNNING})
+            total_count = get_document_count()
+            self.send_json({
+                "indexing_running": IS_INDEXING_RUNNING,
+                "total_docs": total_count
+            })
             return
 
         # API: Available Drives
