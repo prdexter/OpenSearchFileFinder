@@ -1,6 +1,7 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
+- Strict AND matching for multi-word search terms (e.g. 'pdf quality disparities' -> PDF AND quality AND disparities)
 - Full Boolean NOT support (e.g. 'quality NOT IUH', 'quality -IUH', 'quality NOT(IUH)')
 - Direct '⚡ Start Indexing' trigger button in the main header
 - Interactive Directory Tree Picker with Tri-State Indeterminate Checkboxes
@@ -83,9 +84,10 @@ def list_subdirectories(parent_path: str):
 def parse_smart_query(user_query: str, sort_by: str = "relevance"):
     """
     Parses plain search queries with support for:
+    - Strict AND matching for space-separated words (e.g. 'quality disparities' -> quality AND disparities)
     - File extensions (pdf, docx, xlsx, md)
     - Boolean NOT operators ('NOT IUH', '-IUH', 'NOT(IUH)')
-    - Multi-word matching
+    - Explicit OR operators ('quality OR disparities')
     """
     raw_query = user_query.strip()
     
@@ -104,6 +106,9 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance"):
             continue
 
         token_upper = token.upper()
+
+        if token_upper in ('AND', 'OR'):
+            continue
 
         # Handle NOT term syntax (e.g. 'NOT IUH')
         if token_upper == 'NOT' or token_upper == 'AND NOT':
@@ -132,14 +137,15 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance"):
         must_conditions.append({"terms": {"file_type": file_types}})
         
     if must_terms:
-        search_text = " ".join(must_terms)
-        must_conditions.append({
-            "multi_match": {
-                "query": search_text,
-                "fields": ["content^3", "file_name^5"],
-                "type": "best_fields"
-            }
-        })
+        # Enforce strict AND matching across all search terms
+        for term in must_terms:
+            must_conditions.append({
+                "multi_match": {
+                    "query": term,
+                    "fields": ["content^3", "file_name^5"],
+                    "type": "best_fields"
+                }
+            })
 
     if must_not_terms:
         for not_term in must_not_terms:
@@ -255,7 +261,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <form class="search-box" method="GET" action="/">
-            <input type="text" name="q" value="{QUERY}" placeholder="Try: 'quality NOT IUH', 'pdf patient -clinic', 'docx', 'pathology'..." autofocus>
+            <input type="text" name="q" value="{QUERY}" placeholder="Try: 'pdf quality disparities', 'quality NOT IUH', 'xlsx pathology'..." autofocus>
             <select name="sort" onchange="this.form.submit()">
                 <option value="relevance" {SORT_RELEVANCE}>Best Match (Relevance)</option>
                 <option value="date_desc" {SORT_DATE_DESC}>Date: Newest First</option>
