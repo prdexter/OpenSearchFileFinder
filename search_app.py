@@ -2,6 +2,7 @@
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
 - Interactive Directory Tree Picker (with drive & folder checkboxes)
+- Robust data-path attribute handling for Windows backslashes
 - Smart extension parsing (pdf, docx, xlsx, txt, md, pptx)
 - Custom sorting (Relevance, Date, Name, Size)
 - Live indexing status trigger
@@ -173,10 +174,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .close { cursor: pointer; font-size: 24px; color: #aaa; }
         .close:hover { color: #000; }
 
-        .tree-container { flex: 1; overflow-y: auto; border: 1px solid #ced4da; border-radius: 6px; padding: 12px; font-family: consolas, monospace; font-size: 14px; background: #fafafa; }
-        .tree-item { margin: 4px 0; }
-        .tree-toggle { cursor: pointer; display: inline-block; width: 18px; text-align: center; font-weight: bold; color: #007bff; user-select: none; }
-        .tree-children { margin-left: 20px; display: none; }
+        .tree-container { flex: 1; overflow-y: auto; border: 1px solid #ced4da; border-radius: 6px; padding: 12px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; background: #fafafa; }
+        .tree-item { margin: 6px 0; }
+        .tree-toggle { cursor: pointer; display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; font-weight: bold; color: #007bff; user-select: none; border-radius: 3px; }
+        .tree-toggle:hover { background-color: #e9ecef; }
+        .tree-children { margin-left: 24px; display: none; }
         .tree-children.open { display: block; }
         
         .modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; border-top: 1px solid #dee2e6; padding-top: 15px; }
@@ -252,18 +254,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
                 const isChecked = selectedPaths.has(drive) ? 'checked' : '';
 
-                driveItem.innerHTML = `
-                    <span class="tree-toggle" onclick="toggleFolder(this, '${escapePath(drive)}')">▶</span>
-                    <input type="checkbox" value="${escapePath(drive)}" ${isChecked} onchange="onCheckboxChange(this)">
-                    <strong>💻 ${drive}</strong>
-                    <div class="tree-children" id="child_${cleanId(drive)}"></div>
-                `;
+                const toggleSpan = document.createElement('span');
+                toggleSpan.className = 'tree-toggle';
+                toggleSpan.innerText = '▶';
+                toggleSpan.setAttribute('data-path', drive);
+                toggleSpan.onclick = function() { toggleFolder(this); };
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = drive;
+                if (isChecked) cb.checked = true;
+                cb.onchange = function() { onCheckboxChange(this); };
+
+                const label = document.createElement('strong');
+                label.innerHTML = ' 💻 ' + drive;
+
+                const childrenDiv = document.createElement('div');
+                childrenDiv.className = 'tree-children';
+
+                driveItem.appendChild(toggleSpan);
+                driveItem.appendChild(cb);
+                driveItem.appendChild(label);
+                driveItem.appendChild(childrenDiv);
                 container.appendChild(driveItem);
             }
         }
 
-        async function toggleFolder(element, path) {
-            const childrenDiv = document.getElementById('child_' + cleanId(path));
+        async function toggleFolder(element) {
+            const path = element.getAttribute('data-path');
+            const treeItem = element.parentElement;
+            const childrenDiv = treeItem.querySelector('.tree-children');
+
             if (element.innerText === '▶') {
                 element.innerText = '▼';
                 childrenDiv.classList.add('open');
@@ -276,17 +297,33 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         childrenDiv.innerHTML = '<div style="margin-left:20px; color:#aaa; font-style:italic;">(Empty or No subfolders)</div>';
                     } else {
                         for (const sub of subdirs) {
-                            const item = document.createElement('div');
-                            item.className = 'tree-item';
+                            const subItem = document.createElement('div');
+                            subItem.className = 'tree-item';
                             const isChecked = selectedPaths.has(sub.path) ? 'checked' : '';
 
-                            item.innerHTML = `
-                                <span class="tree-toggle" onclick="toggleFolder(this, '${escapePath(sub.path)}')">▶</span>
-                                <input type="checkbox" value="${escapePath(sub.path)}" ${isChecked} onchange="onCheckboxChange(this)">
-                                📁 ${sub.name}
-                                <div class="tree-children" id="child_${cleanId(sub.path)}"></div>
-                            `;
-                            childrenDiv.appendChild(item);
+                            const subToggle = document.createElement('span');
+                            subToggle.className = 'tree-toggle';
+                            subToggle.innerText = '▶';
+                            subToggle.setAttribute('data-path', sub.path);
+                            subToggle.onclick = function() { toggleFolder(this); };
+
+                            const subCb = document.createElement('input');
+                            subCb.type = 'checkbox';
+                            subCb.value = sub.path;
+                            if (isChecked) subCb.checked = true;
+                            subCb.onchange = function() { onCheckboxChange(this); };
+
+                            const subLabel = document.createElement('span');
+                            subLabel.innerHTML = ' 📁 ' + sub.name;
+
+                            const subChildren = document.createElement('div');
+                            subChildren.className = 'tree-children';
+
+                            subItem.appendChild(subToggle);
+                            subItem.appendChild(subCb);
+                            subItem.appendChild(subLabel);
+                            subItem.appendChild(subChildren);
+                            childrenDiv.appendChild(subItem);
                         }
                     }
                 }
@@ -302,14 +339,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             } else {
                 selectedPaths.delete(cb.value);
             }
-        }
-
-        function escapePath(p) {
-            return p.replace(/\\\\/g, '\\\\');
-        }
-
-        function cleanId(p) {
-            return p.replace(/[^a-zA-Z0-9]/g, '_');
         }
 
         async function saveSelectedDirectories() {
