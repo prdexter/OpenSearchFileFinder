@@ -72,7 +72,7 @@ def get_thumbnail_bytes(file_path):
             doc = fitz.open(file_path)
             if len(doc) > 0:
                 page = doc[0]
-                pix = page.get_pixmap(dpi=120)  # High resolution Page 1 render
+                pix = page.get_pixmap(dpi=160)  # High resolution 30% larger Page 1 render
                 pix.save(cache_path)
                 doc.close()
                 with open(cache_path, 'rb') as f:
@@ -289,11 +289,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         /* 2-Column Result Card Layout */
         .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; gap: 20px; align-items: flex-start; }
         .card-left { flex: 1; min-width: 0; }
-        .card-right { flex-shrink: 0; width: 190px; }
+        .card-right { flex-shrink: 0; width: 250px; }
         
         .thumb-preview { width: 100%; border-radius: 6px; border: 1px solid #dee2e6; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; background: #fff; }
         .thumb-preview:hover { transform: scale(1.03); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-        .thumb-placeholder { width: 100%; height: 230px; background: #f1f3f5; border-radius: 6px; border: 1px dashed #ced4da; display: flex; align-items: center; justify-content: center; color: #adb5bd; font-size: 13px; font-weight: 500; text-align: center; padding: 10px; }
+        .thumb-placeholder { width: 100%; height: 300px; background: #f1f3f5; border-radius: 6px; border: 1px dashed #ced4da; display: flex; align-items: center; justify-content: center; color: #adb5bd; font-size: 14px; font-weight: 500; text-align: center; padding: 10px; }
 
         .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
         .file-title { font-weight: bold; font-size: 17px; color: #007bff; text-decoration: none; cursor: pointer; }
