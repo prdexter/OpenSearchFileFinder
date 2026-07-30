@@ -1,10 +1,10 @@
 """
 Dedicated Local Web Search Interface & Index Manager for OpenSearch.
 Includes:
+- Native Windows File Launching via /api/open_file (Click title or '↗️ Open File' button)
+- Windows Explorer Folder Launcher via /api/open_folder ('📁 Open Folder' button)
 - Live Document Counter badge in main header ('📊 14,219 Documents Indexed')
 - Dynamic '⚡ Start Indexing' / '⏹️ Stop Indexing' control button
-- API endpoint /api/stop_indexing to safely terminate background indexing processes
-- Automatic background process status & document count polling via /api/status
 - Strict AND matching for multi-word search terms
 - Full Boolean NOT support (e.g. 'quality NOT IUH', 'quality -IUH')
 - Interactive Directory Tree Picker with Tri-State Indeterminate Checkboxes
@@ -32,7 +32,6 @@ HIDDEN_DIRS = {'$recycle.bin', 'system volume information', 'windows', 'program 
 
 # Global variables to track active background indexer process
 INDEXER_PROCESS = None
-IS_INDEXING_RUNNING = False
 
 
 def get_client():
@@ -230,7 +229,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .result-header { display: flex; justify-content: space-between; align-items: center; }
-        .file-title { font-weight: bold; font-size: 17px; color: #007bff; text-decoration: none; }
+        .file-title { font-weight: bold; font-size: 17px; color: #007bff; cursor: pointer; text-decoration: none; }
+        .file-title:hover { text-decoration: underline; color: #0056b3; }
+        
+        .card-actions { display: flex; align-items: center; gap: 8px; }
+        .btn-open-file { background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .btn-open-file:hover { background-color: #0056b3; }
+        .btn-open-folder { background-color: #f8f9fa; color: #495057; border: 1px solid #ced4da; padding: 6px 10px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .btn-open-folder:hover { background-color: #e2e6ea; }
+
         .badge { background: #e9ecef; padding: 4px 10px; border-radius: 12px; font-size: 13px; text-transform: uppercase; font-weight: 600; color: #495057; }
         .file-path { color: #6c757d; font-size: 13px; margin: 4px 0 10px 0; word-break: break-all; }
         .snippet { background: #f8f9fa; padding: 10px; border-left: 4px solid #007bff; border-radius: 4px; font-size: 14px; color: #495057; line-height: 1.5; }
@@ -316,6 +323,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             checkStatus();
             setInterval(checkStatus, 3000);
         });
+
+        async function openFile(filePath) {
+            try {
+                await fetch('/api/open_file?path=' + encodeURIComponent(filePath));
+            } catch (e) {
+                alert('Error opening file: ' + e);
+            }
+        }
+
+        async function openFolder(filePath) {
+            try {
+                await fetch('/api/open_folder?path=' + encodeURIComponent(filePath));
+            } catch (e) {
+                alert('Error opening folder: ' + e);
+            }
+        }
 
         async function checkStatus() {
             try {
@@ -543,11 +566,38 @@ class SearchHandler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
 
+        # API: Open File in Windows Default App
+        if parsed.path == '/api/open_file':
+            file_path = params.get('path', [''])[0]
+            if file_path and os.path.exists(file_path):
+                try:
+                    os.startfile(file_path)
+                    self.send_json({"status": "ok", "message": "File opened successfully"})
+                except Exception as e:
+                    self.send_json({"status": "error", "message": str(e)}, status=500)
+            else:
+                self.send_json({"status": "error", "message": "File not found"}, status=404)
+            return
+
+        # API: Open Containing Folder in File Explorer
+        if parsed.path == '/api/open_folder':
+            file_path = params.get('path', [''])[0]
+            if file_path and os.path.exists(file_path):
+                try:
+                    subprocess.run(['explorer', '/select,', os.path.normpath(file_path)])
+                    self.send_json({"status": "ok", "message": "Folder opened successfully"})
+                except Exception as e:
+                    self.send_json({"status": "error", "message": str(e)}, status=500)
+            else:
+                self.send_json({"status": "error", "message": "Path not found"}, status=404)
+            return
+
         # API: Indexing Status & Total Count
         if parsed.path == '/api/status':
+            is_running = INDEXER_PROCESS is not None and INDEXER_PROCESS.poll() is None
             total_count = get_document_count()
             self.send_json({
-                "indexing_running": IS_INDEXING_RUNNING,
+                "indexing_running": is_running,
                 "total_docs": total_count
             })
             return
@@ -611,6 +661,9 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         fpath = src.get('file_path', '')
                         ftype = src.get('file_type', 'doc')
                         
+                        # Escape single quotes and backslashes for JS inline call
+                        escaped_path = fpath.replace('\\', '\\\\').replace("'", "\\'")
+
                         highlights = hit.get('highlight', {}).get('content', [])
                         if highlights:
                             snippet_text = " ... ".join(highlights)
@@ -620,8 +673,12 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         card = f"""
                         <div class="result-card">
                             <div class="result-header">
-                                <span class="file-title">{fname}</span>
-                                <span class="badge">{ftype}</span>
+                                <a class="file-title" onclick="openFile('{escaped_path}')" title="Click to open file in Windows">{fname}</a>
+                                <div class="card-actions">
+                                    <button class="btn-open-file" onclick="openFile('{escaped_path}')">↗️ Open File</button>
+                                    <button class="btn-open-folder" onclick="openFolder('{escaped_path}')">📁 Folder</button>
+                                    <span class="badge">{ftype}</span>
+                                </div>
                             </div>
                             <div class="file-path">📁 {fpath}</div>
                             <div class="snippet">{snippet_text}</div>
@@ -642,7 +699,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
         self.wfile.write(html_out.encode('utf-8'))
 
     def do_POST(self):
-        global INDEXER_PROCESS, IS_INDEXING_RUNNING
+        global INDEXER_PROCESS
         parsed = urlparse(self.path)
 
         # API: Stop Indexing
@@ -656,7 +713,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         INDEXER_PROCESS.kill()
                     except Exception:
                         pass
-            IS_INDEXING_RUNNING = False
+            INDEXER_PROCESS = None
             self.send_json({"status": "ok", "message": "Indexing stopped."})
             return
 
@@ -679,14 +736,12 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 dirs = data.get("selected_directories", [])
                 if dirs:
                     def run_ingest():
-                        global INDEXER_PROCESS, IS_INDEXING_RUNNING
-                        IS_INDEXING_RUNNING = True
+                        global INDEXER_PROCESS
                         try:
                             cmd = [sys.executable, "ingest_documents.py", "--dir"] + dirs
                             INDEXER_PROCESS = subprocess.Popen(cmd, cwd=os.path.dirname(__file__))
                             INDEXER_PROCESS.wait()
                         finally:
-                            IS_INDEXING_RUNNING = False
                             INDEXER_PROCESS = None
 
                     t = threading.Thread(target=run_ingest)
