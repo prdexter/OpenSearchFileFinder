@@ -63,9 +63,12 @@ SKIP_EXTENSIONS = {
     '.ini', '.log', '.tsv', '.pb', '.pak'
 }
 
-# Pure Human Document extensions (PDF, Word, Excel, Text, Markdown, PPT)
+# Comprehensive Document & Text File Extensions (PDF, Word, Excel, PPT, Markdown, Code, Emails, Web)
 STRICT_DOCUMENT_EXTENSIONS = {
-    '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md', '.rtf', '.pptx', '.ppt'
+    '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.rtf', '.odt', '.ods', '.odp', '.epub',
+    '.txt', '.md', '.markdown', '.csv', '.tsv', '.eml', '.msg',
+    '.py', '.r', '.sql', '.html', '.htm', '.xml', '.json', '.yaml', '.yml',
+    '.sh', '.bat', '.ps1', '.c', '.cpp', '.h', '.cs', '.js', '.ts', '.css'
 }
 
 THUMB_CACHE_DIR = os.path.join(os.path.dirname(__file__), ".cache_thumbnails")
@@ -220,20 +223,17 @@ def extract_file_content(file_path: str, max_bytes: int = 1_000_000) -> str:
         except Exception:
             return ""
 
-    elif ext in ['.xlsx', '.xls'] and openpyxl is not None:
+    elif ext in ['.xlsx', '.xls']:
         try:
-            wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
-            text_parts = []
-            for sheet in wb.worksheets:
-                for row in sheet.iter_rows(values_only=True):
-                    row_str = " ".join([str(val) for val in row if val is not None])
-                    if row_str.strip():
-                        text_parts.append(row_str)
-                    if len(text_parts) > 2000:
-                        break
-            return "\n".join(text_parts)[:max_bytes]
+            with zipfile.ZipFile(file_path) as z:
+                if 'xl/sharedStrings.xml' in z.namelist():
+                    xml_content = z.read('xl/sharedStrings.xml')
+                    tree = ET.fromstring(xml_content)
+                    text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t')
+                    return " ".join([node.text for node in text_nodes if node.text])[:max_bytes]
         except Exception:
-            return ""
+            pass
+        return ""
 
     return ""
 
@@ -252,8 +252,6 @@ def process_single_file(file_path: str, index_name: str) -> dict:
         file_dir = os.path.dirname(file_path)
         file_type = ext.lstrip('.').lower()
         content = extract_file_content(file_path)
-
-        generate_thumbnail_if_missing(file_path, ext)
         
         doc = {
             "_op_type": "index",
@@ -328,22 +326,23 @@ def main():
         for file_path in scan_directories(args.dir):
             futures.add(executor.submit(process_single_file, file_path, args.index))
 
-            if len(futures) >= 40:
-                completed = set()
-                for fut in as_completed(futures):
+            # Continuous non-blocking check of finished threads
+            done_futures = {f for f in futures if f.done()}
+            if done_futures:
+                for fut in done_futures:
                     doc = fut.result()
                     if doc:
                         batch.append(doc)
-                    completed.add(fut)
-                    if len(completed) >= 20:
-                        break
-                futures -= completed
+                futures -= done_futures
 
-                if len(batch) >= 20:
-                    helpers.bulk(client, batch)
-                    client.indices.refresh(index=args.index)
-                    total_indexed += len(batch)
-                    print(f"[+] Bulk indexed {total_indexed} documents (Real-time update)...")
+                if len(batch) >= 10:
+                    try:
+                        helpers.bulk(client, batch)
+                        client.indices.refresh(index=args.index)
+                        total_indexed += len(batch)
+                        print(f"[+] Bulk indexed {total_indexed} documents (Real-time update)...")
+                    except Exception as e:
+                        print(f"[-] Bulk ingest error: {e}")
                     batch = []
 
         # Flush remaining futures
@@ -353,9 +352,12 @@ def main():
                 batch.append(doc)
 
         if batch:
-            helpers.bulk(client, batch)
-            client.indices.refresh(index=args.index)
-            total_indexed += len(batch)
+            try:
+                helpers.bulk(client, batch)
+                client.indices.refresh(index=args.index)
+                total_indexed += len(batch)
+            except Exception:
+                pass
 
     elapsed = time.time() - start_time
     print(f"[✓] Ingestion complete! Total documents indexed: {total_indexed:,} in {elapsed:.2f} seconds.")

@@ -40,7 +40,12 @@ OPENSEARCH_HOST = "localhost"
 OPENSEARCH_PORT = 9200
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "indexer_config.json")
 THUMB_CACHE_DIR = os.path.join(os.path.dirname(__file__), ".cache_thumbnails")
-KNOWN_EXTENSIONS = {'pdf', 'docx', 'doc', 'xlsx', 'xls', 'txt', 'csv', 'md', 'rtf', 'pptx', 'ppt'}
+KNOWN_EXTENSIONS = {
+    'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'rtf', 'odt', 'ods', 'odp', 'epub',
+    'txt', 'md', 'markdown', 'csv', 'tsv', 'eml', 'msg',
+    'py', 'r', 'sql', 'html', 'htm', 'xml', 'json', 'yaml', 'yml',
+    'sh', 'bat', 'ps1', 'c', 'cpp', 'h', 'cs', 'js', 'ts', 'css'
+}
 PAGE_SIZE = 100
 
 DOPUS_RT = r"C:\Program Files\GPSoftware\Directory Opus\dopusrt.exe"
