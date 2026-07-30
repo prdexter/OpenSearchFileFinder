@@ -1,6 +1,8 @@
 """
 High-Performance Document Ingestion Pipeline for OpenSearch.
-Flushes bulk batches in real-time chunks of 100 documents for live UI counter updates.
+Includes:
+- Integrated Page 1 Thumbnail Generation directly during Document Indexing
+- Real-time chunking for live UI counter updates
 """
 
 import os
@@ -9,13 +11,14 @@ import json
 import time
 import hashlib
 import argparse
+import threading
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from opensearchpy import OpenSearch, helpers
+import fitz  # PyMuPDF for PDF thumbnail rendering
 
-# Optional text extraction imports
 try:
     import pypdf
 except ImportError:
@@ -31,7 +34,13 @@ try:
 except ImportError:
     openpyxl = None
 
-# Default folders to skip (OS binaries, cache, system temporary files, cloud caches)
+try:
+    import win32com.client
+    HAS_WORD = True
+except ImportError:
+    HAS_WORD = False
+
+# Default folders to skip
 DEFAULT_EXCLUDE_DIRS = {
     r'c:\windows', r'c:\program files', r'c:\program files (x86)',
     r'c:\programdata', r'$recycle.bin', r'system volume information',
@@ -52,6 +61,60 @@ SKIP_EXTENSIONS = {
 STRICT_DOCUMENT_EXTENSIONS = {
     '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md', '.rtf', '.pptx', '.ppt'
 }
+
+THUMB_CACHE_DIR = os.path.join(os.path.dirname(__file__), ".cache_thumbnails")
+if not os.path.exists(THUMB_CACHE_DIR):
+    os.makedirs(THUMB_CACHE_DIR, exist_ok=True)
+
+WORD_LOCK = threading.Lock()
+
+
+def generate_thumbnail_if_missing(file_path: str, ext: str):
+    """
+    Generates Page 1 thumbnail during indexing if not already cached on disk.
+    """
+    try:
+        file_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
+        cache_path = os.path.join(THUMB_CACHE_DIR, f"{file_hash}.jpg")
+
+        if os.path.exists(cache_path):
+            return
+
+        if ext == '.pdf':
+            doc = fitz.open(file_path)
+            if len(doc) > 0:
+                page = doc[0]
+                pix = page.get_pixmap(dpi=200)
+                pix.save(cache_path)
+                doc.close()
+
+        elif ext in ('.docx', '.doc') and HAS_WORD:
+            with WORD_LOCK:
+                temp_pdf = os.path.join(THUMB_CACHE_DIR, f"temp_{file_hash}.pdf")
+                try:
+                    word = win32com.client.Dispatch("Word.Application")
+                    word.Visible = False
+                    doc = word.Documents.Open(os.path.abspath(file_path))
+                    doc.SaveAs(temp_pdf, FileFormat=17)
+                    doc.Close()
+                    word.Quit()
+
+                    fitz_doc = fitz.open(temp_pdf)
+                    if len(fitz_doc) > 0:
+                        pix = fitz_doc[0].get_pixmap(dpi=200)
+                        pix.save(cache_path)
+                    fitz_doc.close()
+
+                    if os.path.exists(temp_pdf):
+                        os.remove(temp_pdf)
+                except Exception:
+                    if os.path.exists(temp_pdf):
+                        try:
+                            os.remove(temp_pdf)
+                        except Exception:
+                            pass
+    except Exception:
+        pass
 
 
 def get_opensearch_client(host="localhost", port=9200):
@@ -162,6 +225,9 @@ def process_single_file(file_path: str, index_name: str) -> dict:
         file_dir = os.path.dirname(file_path)
         file_type = ext.lstrip('.').lower()
         content = extract_file_content(file_path)
+
+        # Generate Page 1 Thumbnail persistently during ingestion
+        generate_thumbnail_if_missing(file_path, ext)
         
         doc = {
             "_op_type": "index",
@@ -198,93 +264,68 @@ def scan_directories(target_dirs: list):
         print(f"[*] Scanning target: {target_dir}")
         for root, dirs, files in os.walk(target_dir, topdown=True):
             dirs[:] = [d for d in dirs if not is_excluded_dir(os.path.join(root, d))]
-            
-            if is_excluded_dir(root):
-                continue
-                
-            for f in files:
-                ext = os.path.splitext(f)[1].lower()
-                if ext in STRICT_DOCUMENT_EXTENSIONS and not f.startswith('~') and not f.startswith('.'):
-                    yield os.path.join(root, f)
-
-
-def bulk_ingest(client, target_dirs: list, index_name="documents", batch_size=100, num_threads=8):
-    file_generator = scan_directories(target_dirs)
-    
-    actions_buffer = []
-    total_indexed = 0
-    total_failed = 0
-    start_time = time.time()
-
-    executor = ThreadPoolExecutor(max_workers=num_threads)
-    pending_futures = []
-    
-    try:
-        for file_path in file_generator:
-            future = executor.submit(process_single_file, file_path, index_name)
-            pending_futures.append(future)
-            
-            if len(pending_futures) >= batch_size:
-                for fut in as_completed(pending_futures):
-                    res = fut.result()
-                    if res:
-                        actions_buffer.append(res)
-                    else:
-                        total_failed += 1
-                        
-                pending_futures = []
-                
-                if actions_buffer:
-                    success_count, errors = helpers.bulk(client, actions_buffer, stats_only=False, raise_on_error=False)
-                    total_indexed += success_count
-                    if errors:
-                        total_failed += len(errors)
-                    actions_buffer = []
-                    # Force refresh index so live count updates immediately in UI
-                    try:
-                        client.indices.refresh(index=index_name)
-                    except Exception:
-                        pass
-    except Exception as e:
-        print(f"[!] Error during directory scan: {e}")
-
-    if pending_futures:
-        for fut in as_completed(pending_futures):
-            res = fut.result()
-            if res:
-                actions_buffer.append(res)
-            else:
-                total_failed += 1
-
-    if actions_buffer:
-        success_count, errors = helpers.bulk(client, actions_buffer, stats_only=False, raise_on_error=False)
-        total_indexed += success_count
-        if errors:
-            total_failed += len(errors)
-        try:
-            client.indices.refresh(index=index_name)
-        except Exception:
-            pass
-
-    executor.shutdown(wait=True)
+            for file in files:
+                file_path = os.path.join(root, file)
+                yield file_path
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Ingest documents into OpenSearch.")
-    parser.add_argument("--dir", nargs="+", help="One or more directory paths to scan and index")
-    parser.add_argument("--index", type=str, default="documents", help="OpenSearch index name (default: documents)")
-    parser.add_argument("--threads", type=int, default=8, help="Number of worker threads (default: 8)")
-    parser.add_argument("--batch", type=int, default=100, help="Batch size for bulk indexing (default: 100)")
-    
+    parser = argparse.ArgumentParser(description="Ingest documents into OpenSearch")
+    parser.add_argument("--dir", nargs="+", help="Directories to scan and index")
+    parser.add_argument("--index", default="documents", help="Target OpenSearch index name")
     args = parser.parse_args()
+
+    if not args.dir:
+        config_path = os.path.join(os.path.dirname(__file__), "indexer_config.json")
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                args.dir = cfg.get("selected_directories", [r"D:\Active research"])
+        else:
+            args.dir = [r"D:\Active research"]
+
+    print(f"[*] Ingestion starting for directories: {args.dir}")
     client = get_opensearch_client()
     ensure_index_exists(client, index_name=args.index)
-    
-    target_dirs = args.dir
-    if not target_dirs:
-        return
-        
-    bulk_ingest(client, target_dirs=target_dirs, index_name=args.index, batch_size=args.batch, num_threads=args.threads)
+
+    start_time = time.time()
+    batch = []
+    total_indexed = 0
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = set()
+        for file_path in scan_directories(args.dir):
+            futures.add(executor.submit(process_single_file, file_path, args.index))
+
+            if len(futures) >= 100:
+                completed = set()
+                for fut in as_completed(futures):
+                    doc = fut.result()
+                    if doc:
+                        batch.append(doc)
+                    completed.add(fut)
+                    if len(completed) >= 50:
+                        break
+                futures -= completed
+
+                if len(batch) >= 100:
+                    helpers.bulk(client, batch)
+                    total_indexed += len(batch)
+                    print(f"[+] Bulk indexed {total_indexed} documents...")
+                    batch = []
+
+        # Flush remaining futures
+        for fut in as_completed(futures):
+            doc = fut.result()
+            if doc:
+                batch.append(doc)
+
+        if batch:
+            helpers.bulk(client, batch)
+            total_indexed += len(batch)
+
+    elapsed = time.time() - start_time
+    print(f"[✓] Ingestion complete! Total documents indexed: {total_indexed:,} in {elapsed:.2f} seconds.")
 
 
 if __name__ == "__main__":
