@@ -1,0 +1,6 @@
+@echo off
+echo Stopping X1 Search...
+taskkill /f /im X1* 2>nul
+timeout /t 2 /nobreak >nul
+echo Starting X1 Search...
+start "" "C:\Program Files\X1 Search\X1.exe"

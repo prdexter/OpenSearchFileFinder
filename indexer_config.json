@@ -1,10 +1,11 @@
 {
   "selected_directories": [
-    "D:\\",
-    "C:\\Users\\Paul Dexter\\Documents",
-    "C:\\Users\\Paul Dexter\\OneDrive - Indiana University",
-    "C:\\Users\\Paul Dexter\\Downloads",
-    "C:\\Users\\Paul Dexter\\Desktop",
-    "C:\\Users\\Paul Dexter\\OneDrive"
+    "D:\\Active research",
+    "C:\\Users\\Paul Dexter\\OneDrive",
+    "D:\\Dropbox"
+  ],
+  "backup_directory": "D:\\Backups\\Documents\\",
+  "exclude_backup_extensions": [
+    ".csv"
   ]
 }

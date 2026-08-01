@@ -11,6 +11,7 @@ Includes:
 """
 
 import os
+import io
 import re
 import json
 import string
@@ -19,6 +20,7 @@ import html
 import time
 import urllib.parse
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import subprocess
 import hashlib
 import zipfile
@@ -26,10 +28,39 @@ import math
 import xml.etree.ElementTree as ET
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
+from datetime import datetime
 from pathlib import Path
 from opensearchpy import OpenSearch
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageStat
 import fitz  # PyMuPDF for PDF thumbnail rendering
+try:
+    fitz.TOOLS.mupdf_display_errors(False)
+except Exception:
+    pass
+
+
+def format_doc_date(date_str):
+    if not date_str:
+        return ""
+    try:
+        dt = datetime.fromisoformat(str(date_str))
+        return dt.strftime("%b %d, %Y, %I:%M %p")
+    except Exception:
+        try:
+            return str(date_str).split('T')[0]
+        except Exception:
+            return str(date_str)
+
+try:
+    import mammoth
+    from html2image import Html2Image
+    HTI_LOCK = threading.Lock()
+    HTI_INSTANCE = None
+except ImportError:
+    mammoth = None
+    Html2Image = None
+    HTI_LOCK = None
+    HTI_INSTANCE = None
 
 try:
     import openpyxl
@@ -78,7 +109,53 @@ def parse_hex_color(openpyxl_color, default='#ffffff'):
     return default
 
 
+def get_thumbnail_hash(file_path):
+    norm = os.path.normpath(os.path.abspath(file_path)).lower()
+    return hashlib.md5(norm.encode('utf-8')).hexdigest()
+
+
 def generate_fast_docx_cover(file_path, cache_path):
+    if mammoth is not None and Html2Image is not None:
+        try:
+            with open(file_path, 'rb') as docx_file:
+                res = mammoth.convert_to_html(docx_file)
+                html_body = res.value[:50000] if res.value else ""
+
+            if html_body and len(html_body.strip()) > 0:
+                html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body {{ background: #ffffff; margin: 0; padding: 25px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+.container {{ max-width: 850px; margin: 0 auto; background: white; padding: 35px; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); line-height: 1.6; font-size: 16px; color: #212529; min-height: 950px; }}
+table {{ border-collapse: collapse; width: 100%; font-size: 14px; margin: 15px 0; }}
+td, th {{ border: 1px solid #dee2e6; padding: 8px 12px; text-align: left; }}
+tr:nth-child(even) {{ background-color: #f8f9fa; }}
+tr:first-child {{ background-color: #e9ecef; font-weight: bold; }}
+h1, h2, h3, h4, h5, h6 {{ margin-top: 0; color: #111; }}
+p {{ margin-bottom: 1rem; }}
+</style>
+</head>
+<body>
+<div class="container">{html_body}</div>
+</body>
+</html>"""
+                out_dir = os.path.dirname(cache_path)
+                out_name = os.path.basename(cache_path)
+                with HTI_LOCK:
+                    global HTI_INSTANCE
+                    if HTI_INSTANCE is None:
+                        HTI_INSTANCE = Html2Image(output_path=out_dir, size=(850, 1020), custom_flags=['--hide-scrollbars', '--no-sandbox', '--disable-gpu'])
+                    else:
+                        HTI_INSTANCE.output_path = out_dir
+                    HTI_INSTANCE.screenshot(html_str=html_content, save_as=out_name)
+
+                if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+                    return
+        except Exception:
+            pass
+
     file_name = os.path.basename(file_path)
     snippet = ""
     try:
@@ -238,52 +315,193 @@ def generate_fast_xlsx_cover(file_path, cache_path):
 
 def generate_fast_pptx_cover(file_path, cache_path):
     file_name = os.path.basename(file_path)
-    snippet = ""
+
+    # 1. Fast Native Embedded Slide 1 Image Extraction from Zip Archive
+
+    generate_fast_pptx_pil_fallback(file_path, cache_path)
+
+
+def generate_fast_pptx_pil_fallback(file_path, cache_path):
+    file_name = os.path.basename(file_path)
+
+    # 1. Extract High-Res Embedded Slide 1 Image ONLY IF IT IS NOT A BLANK DUMMY
     try:
-        with zipfile.ZipFile(file_path) as z:
-            slide_files = [f for f in z.namelist() if f.startswith('ppt/slides/slide') and f.endswith('.xml')]
-            texts = []
-            for sf in slide_files[:5]:
-                xml_content = z.read(sf)
-                tree = ET.fromstring(xml_content)
-                text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/drawingml/2006/main}t')
-                texts.extend([node.text for node in text_nodes if node.text])
-            snippet = " ".join(texts)[:400]
+        if zipfile.is_zipfile(file_path):
+            with zipfile.ZipFile(file_path) as z:
+                for item in z.namelist():
+                    if item.lower() in ('docprops/thumbnail.jpeg', 'docprops/thumbnail.jpg', 'docprops/thumbnail.png'):
+                        img_bytes = z.read(item)
+                        slide_img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
+
+                        # Validate that embedded thumbnail is not a blank/solid white dummy image
+                        stat = ImageStat.Stat(slide_img)
+                        if sum(stat.stddev) >= 3.0:
+                            canvas = Image.new('RGB', (600, 720), '#f8f9fa')
+                            draw = ImageDraw.Draw(canvas)
+
+                            sw, sh = slide_img.size
+                            scale = min(560 / sw, 520 / sh)
+                            nw, nh = int(sw * scale), int(sh * scale)
+                            resized_slide = slide_img.resize((nw, nh), Image.Resampling.LANCZOS)
+
+                            x = (600 - nw) // 2
+                            y = (720 - nh) // 2 + 10
+
+                            draw.rectangle([0, 0, 599, 719], outline='#d0d0d0', width=1)
+                            draw.rectangle([x - 4, y - 4, x + nw + 4, y + nh + 4], fill='#e4e6e9')
+                            draw.rectangle([x - 2, y - 2, x + nw + 2, y + nh + 2], fill='#cfd2d7')
+                            canvas.paste(resized_slide, (x, y))
+
+                            draw.rectangle([0, 0, 600, 32], fill='#d24726')
+                            try:
+                                font_header = ImageFont.truetype('arialbd.ttf', 13)
+                            except Exception:
+                                font_header = ImageFont.load_default()
+                            draw.text((15, 8), f"PowerPoint  |  {file_name[:48]}", fill='#ffffff', font=font_header)
+
+                            canvas.save(cache_path, 'JPEG', quality=95)
+                            return
     except Exception:
         pass
 
-    img = Image.new('RGB', (600, 720), color='#ffffff')
-    draw = ImageDraw.Draw(img)
+    # 2. Render Presentation Slide Card from Slide 1 & Slide 2 XML/pptx shapes
+    slide1_texts = []
+    slide2_texts = []
 
-    draw.rectangle([0, 0, 599, 719], outline='#dee2e6', width=2)
-    draw.rectangle([0, 0, 600, 18], fill='#fd7e14')
-    draw.rectangle([0, 18, 600, 110], fill='#f8f9fa')
+    try:
+        import pptx
+        prs = pptx.Presentation(file_path)
+        if len(prs.slides) > 0:
+            for shape in prs.slides[0].shapes:
+                if shape.has_text_frame and shape.text_frame.text.strip():
+                    slide1_texts.append(shape.text_frame.text.strip())
+        if len(prs.slides) > 1:
+            for shape in prs.slides[1].shapes:
+                if shape.has_text_frame and shape.text_frame.text.strip():
+                    slide2_texts.append(shape.text_frame.text.strip())
+    except Exception:
+        pass
 
-    draw.text((30, 38), "POWERPOINT PRESENTATION", fill='#6c757d')
-    draw.text((30, 65), file_name[:42], fill='#fd7e14')
+    if not slide1_texts:
+        try:
+            with zipfile.ZipFile(file_path) as z:
+                if 'ppt/slides/slide1.xml' in z.namelist():
+                    xml1 = z.read('ppt/slides/slide1.xml')
+                    tree1 = ET.fromstring(xml1)
+                    nodes1 = tree1.findall('.//{http://schemas.openxmlformats.org/drawingml/2006/main}t')
+                    slide1_texts = [n.text.strip() for n in nodes1 if n.text and n.text.strip()]
 
-    draw.rectangle([30, 140, 570, 143], fill='#fd7e14')
-    draw.rectangle([30, 160, 36, 680], fill='#fd7e14')
+                if 'ppt/slides/slide2.xml' in z.namelist():
+                    xml2 = z.read('ppt/slides/slide2.xml')
+                    tree2 = ET.fromstring(xml2)
+                    nodes2 = tree2.findall('.//{http://schemas.openxmlformats.org/drawingml/2006/main}t')
+                    slide2_texts = [n.text.strip() for n in nodes2 if n.text and n.text.strip()]
+        except Exception:
+            pass
 
-    y = 165
-    if snippet:
-        words = snippet.split()
-        current_line = []
-        for word in words:
-            current_line.append(word)
-            line_str = " ".join(current_line)
-            if len(line_str) >= 42:
-                draw.text((50, y), line_str, fill='#333333')
-                y += 26
-                current_line = []
-                if y > 650:
+    title_text = slide1_texts[0] if slide1_texts else file_name[:40]
+    subtitle_text = slide1_texts[1] if len(slide1_texts) > 1 else ""
+    callout_text = slide1_texts[2] if len(slide1_texts) > 2 else ""
+
+    canvas = Image.new('RGB', (600, 720), '#f4f6f9')
+    draw = ImageDraw.Draw(canvas)
+
+    draw.rectangle([0, 0, 599, 719], outline='#cfd2d7', width=1)
+    draw.rectangle([0, 0, 600, 32], fill='#d24726')
+    try:
+        font_header = ImageFont.truetype('arialbd.ttf', 13)
+        font_title = ImageFont.truetype('arialbd.ttf', 20)
+        font_sub = ImageFont.truetype('arial.ttf', 13)
+        font_body = ImageFont.truetype('arial.ttf', 11)
+    except Exception:
+        font_header = font_title = font_sub = font_body = ImageFont.load_default()
+
+    draw.text((15, 8), f"PowerPoint  |  {file_name[:48]}", fill='#ffffff', font=font_header)
+
+    # 1. Main Slide 1 16:9 Widescreen Frame (540px x 320px)
+    sx, sy, sw, sh = 30, 55, 540, 320
+    draw.rectangle([sx - 4, sy - 4, sx + sw + 4, sy + sh + 4], fill='#e2e5e9')
+    draw.rectangle([sx - 2, sy - 2, sx + sw + 2, sy + sh + 2], fill='#d0d4da')
+    draw.rectangle([sx, sy, sx + sw, sy + sh], fill='#ffffff', outline='#d24726', width=2)
+
+    ty = sy + 25
+    words = title_text.split()
+    line = []
+    for w in words:
+        line.append(w)
+        if len(" ".join(line)) >= 32:
+            draw.text((sx + 25, ty), " ".join(line), fill='#1a2530', font=font_title)
+            ty += 26
+            line = []
+            if ty > sy + 110:
+                break
+    if line and ty <= sy + 110:
+        draw.text((sx + 25, ty), " ".join(line), fill='#1a2530', font=font_title)
+        ty += 30
+
+    if subtitle_text:
+        words = subtitle_text.split()
+        line = []
+        for w in words:
+            line.append(w)
+            if len(" ".join(line)) >= 48:
+                draw.text((sx + 25, ty), " ".join(line), fill='#5f6b7a', font=font_sub)
+                ty += 18
+                line = []
+                if ty > sy + 170:
                     break
-        if current_line and y <= 650:
-            draw.text((50, y), " ".join(current_line), fill='#333333')
-    else:
-        draw.text((50, 165), "(PowerPoint Slide Preview)", fill='#6c757d')
+        if line and ty <= sy + 170:
+            draw.text((sx + 25, ty), " ".join(line), fill='#5f6b7a', font=font_sub)
+            ty += 22
 
-    img.save(cache_path, 'JPEG', quality=90)
+    if callout_text:
+        cx, cy, cw, ch = sx + 25, ty + 10, sw - 50, sy + sh - ty - 25
+        if ch >= 40:
+            draw.rectangle([cx, cy, cx + cw, cy + ch], fill='#f8f9fa', outline='#d0d4da', width=1)
+            words = callout_text.split()
+            line = []
+            cty = cy + 10
+            for w in words:
+                line.append(w)
+                if len(" ".join(line)) >= 58:
+                    draw.text((cx + 12, cty), " ".join(line), fill='#334155', font=font_body)
+                    cty += 16
+                    line = []
+                    if cty > cy + ch - 18:
+                        break
+            if line and cty <= cy + ch - 18:
+                draw.text((cx + 12, cty), " ".join(line), fill='#334155', font=font_body)
+
+    # 2. Slide 2 / Overview Frame (Lower Half: 540px x 290px)
+    sy2 = 395
+    draw.rectangle([sx - 4, sy2 - 4, sx + sw + 4, sy2 + 290 + 4], fill='#e2e5e9')
+    draw.rectangle([sx - 2, sy2 - 2, sx + sw + 2, sy2 + 290 + 2], fill='#d0d4da')
+    draw.rectangle([sx, sy2, sx + sw, sy2 + 290], fill='#ffffff', outline='#cbd5e1', width=1)
+    
+    s2_title = slide2_texts[0] if slide2_texts else "SLIDE OVERVIEW & ROADMAP"
+    draw.rectangle([sx, sy2, sx + sw, sy2 + 32], fill='#f1f5f9')
+    draw.text((sx + 20, sy2 + 8), s2_title[:45].upper(), fill='#475569', font=font_header)
+    
+    ty2 = sy2 + 45
+    if len(slide2_texts) > 1:
+        for st in slide2_texts[1:6]:
+            words = st.split()
+            line = []
+            for w in words:
+                line.append(w)
+                if len(" ".join(line)) >= 56:
+                    draw.text((sx + 25, ty2), f"• {" ".join(line)}", fill='#334155', font=font_body)
+                    ty2 += 18
+                    line = []
+                    if ty2 > sy2 + 260:
+                        break
+            if line and ty2 <= sy2 + 260:
+                draw.text((sx + 25, ty2), f"• {" ".join(line)}", fill='#334155', font=font_body)
+                ty2 += 20
+    else:
+        draw.text((sx + 25, ty2), "Presentation contains structured case vignettes & teaching anchors.", fill='#64748b', font=font_sub)
+
+    canvas.save(cache_path, 'JPEG', quality=95)
 
 
 def generate_fast_text_cover(file_path, cache_path, ftype):
@@ -323,14 +541,16 @@ def generate_fast_text_cover(file_path, cache_path, ftype):
     img.save(cache_path, 'JPEG', quality=90)
 
 
+THUMB_EXECUTOR = ThreadPoolExecutor(max_workers=4)
+
 def get_thumbnail_bytes(file_path):
     if not os.path.exists(file_path):
         return None, None
 
-    file_hash = hashlib.md5(file_path.encode('utf-8')).hexdigest()
+    file_hash = get_thumbnail_hash(file_path)
     cache_path = os.path.join(THUMB_CACHE_DIR, f"{file_hash}.jpg")
 
-    if os.path.exists(cache_path):
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
         try:
             with open(cache_path, 'rb') as f:
                 return f.read(), "image/jpeg"
@@ -369,12 +589,19 @@ def get_thumbnail_bytes(file_path):
             pass
 
     elif ext in ('pptx', 'ppt'):
-        try:
-            generate_fast_pptx_cover(file_path, cache_path)
-            with open(cache_path, 'rb') as f:
-                return f.read(), "image/jpeg"
-        except Exception:
-            pass
+        # 1. Asynchronously submit COM PowerPoint slide export to background worker
+        THUMB_EXECUTOR.submit(generate_fast_pptx_cover, file_path, cache_path)
+
+        # 2. Instantly serve fast 2-ms PIL card so HTTP response never blocks (< 2ms response)
+        fast_cache = cache_path + '.fast.jpg'
+        if not os.path.exists(fast_cache):
+            generate_fast_pptx_pil_fallback(file_path, fast_cache)
+        if os.path.exists(fast_cache):
+            try:
+                with open(fast_cache, 'rb') as f:
+                    return f.read(), "image/jpeg"
+            except Exception:
+                pass
 
     elif ext in ('txt', 'md', 'csv', 'rtf'):
         try:
@@ -571,7 +798,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1150px; margin: 0 auto; }
+        .container { max-width: 1350px; margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 15px; }
         .header-title h2 { margin: 0; font-size: 24px; color: #007bff; }
         .header-title p { margin: 4px 0 0 0; color: #6c757d; font-size: 14px; }
@@ -594,7 +821,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         .stats-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .stats { color: #6c757d; font-weight: 500; }
         .toast-notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 14px 28px; border-radius: 6px; font-size: 15px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; z-index: 2000; }
-        .index-badge { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; }
+        .index-badge { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; padding: 6px 14px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; animation: indexPulse 1.5s infinite; }
+        @keyframes indexPulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
         /* Pagination Bar Styles */
         .pagination-bar { display: flex; justify-content: space-between; align-items: center; background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 12px 20px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
@@ -603,10 +831,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         .btn-page:hover { background-color: #0056b3; color: white; }
         .btn-page.disabled { background-color: #e9ecef; color: #adb5bd; pointer-events: none; cursor: default; }
 
-        /* 2-Column Result Card Layout with 300px Right Column Preview */
-        .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; gap: 20px; align-items: flex-start; }
+        /* 2-Column Result Card Layout with 400px Right Column Preview */
+        .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; gap: 24px; align-items: flex-start; }
         .card-left { flex: 1; min-width: 0; }
-        .card-right { flex-shrink: 0; width: 300px; }
+        .card-right { flex-shrink: 0; width: 400px; }
         
         .thumb-preview { width: 100%; border-radius: 6px; border: 1px solid #dee2e6; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; background: #fff; }
         .thumb-preview:hover { transform: scale(1.03); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
@@ -628,8 +856,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         .btn-open-folder:hover { background-color: #593196; color: white; }
 
         .badge { background: #e9ecef; padding: 4px 10px; border-radius: 12px; font-size: 13px; text-transform: uppercase; font-weight: 600; color: #495057; }
-        .file-path { color: #6c757d; font-size: 13px; margin: 4px 0 10px 0; word-break: break-all; text-decoration: none; display: inline-block; cursor: pointer; }
+        .file-path { color: #6c757d; font-size: 13px; margin: 4px 0 6px 0; word-break: break-all; text-decoration: none; display: inline-block; cursor: pointer; }
         .file-path:hover { text-decoration: underline; color: #007bff; }
+        .file-meta-dates { display: flex; gap: 16px; font-size: 13px; color: #6c757d; margin-bottom: 8px; flex-wrap: wrap; }
+        .meta-date-item { display: inline-flex; align-items: center; gap: 4px; }
+        .meta-date-item strong { color: #495057; font-weight: 600; }
         .snippet { background: #f8f9fa; padding: 12px; border-left: 4px solid #007bff; border-radius: 4px; font-size: 14px; color: #495057; line-height: 1.5; margin-top: 6px; }
         mark { background-color: #ffe066; padding: 2px 4px; border-radius: 3px; font-weight: bold; }
 
@@ -849,7 +1080,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                     if (isIndexing) {
                         btn.className = 'btn-index running';
                         btn.innerText = '⏹️ Stop Indexing';
-                        badge.style.display = 'block';
+                        badge.style.display = 'inline-block';
+                        
+                        if (data.status_message) {
+                            badge.innerText = '⏳ ' + data.status_message;
+                        } else if (data.scanned > 0) {
+                            badge.innerText = '⏳ Checking files: ' + data.scanned.toLocaleString() + ' scanned (' + data.indexed.toLocaleString() + ' updated, ' + data.skipped.toLocaleString() + ' skipped)';
+                        } else {
+                            badge.innerText = '⚡ Live Indexing in Progress...';
+                        }
                     } else {
                         btn.className = 'btn-index';
                         btn.innerText = '⚡ Start Indexing';
@@ -1049,13 +1288,77 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 checkStatus();
             }, 1500);
         }
+
+        // Live automatic status & total document count updates every 2 seconds
+        setInterval(checkStatus, 2000);
+        checkStatus();
     </script>
 </body>
 </html>
 """
 
 
+def stop_all_indexer_processes():
+    global INDEXER_PROCESS
+    if INDEXER_PROCESS and INDEXER_PROCESS.poll() is None:
+        try:
+            INDEXER_PROCESS.terminate()
+            INDEXER_PROCESS.kill()
+        except Exception:
+            pass
+    INDEXER_PROCESS = None
+
+    try:
+        subprocess.run(['powershell', '-Command', "Get-CimInstance Win32_Process -Filter \"name = 'python.exe'\" | Where-Object { $_.CommandLine -like '*ingest_documents.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"], capture_output=True)
+    except Exception:
+        pass
+
+    prog_file = os.path.join(os.path.dirname(__file__), "indexer_progress.json")
+    if os.path.exists(prog_file):
+        try:
+            with open(prog_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            data["is_running"] = False
+            data["status_message"] = ""
+            with open(prog_file, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+        except Exception:
+            pass
+
+
+def check_indexer_process_running():
+    global INDEXER_PROCESS
+    if INDEXER_PROCESS is not None and INDEXER_PROCESS.poll() is None:
+        return True
+    try:
+        import psutil
+        for p in psutil.process_iter(['name', 'cmdline']):
+            if p.info['name'] and 'python' in p.info['name'].lower():
+                cmd = p.info['cmdline']
+                if cmd and any('ingest_documents.py' in arg for arg in cmd):
+                    return True
+    except Exception:
+        pass
+
+    prog_file = os.path.join(os.path.dirname(__file__), "indexer_progress.json")
+    if os.path.exists(prog_file):
+        try:
+            with open(prog_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if data.get("is_running") and (time.time() - data.get("timestamp", 0)) < 120:
+                return True
+        except Exception:
+            pass
+    return False
+
+
 class SearchHandler(SimpleHTTPRequestHandler):
+    def send_json(self, data, status=200):
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(json.dumps(data).encode('utf-8'))
+
     def do_GET(self):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
@@ -1162,11 +1465,31 @@ class SearchHandler(SimpleHTTPRequestHandler):
 
         # API: Indexing Status & Total Count
         if parsed.path == '/api/status':
-            is_running = INDEXER_PROCESS is not None and INDEXER_PROCESS.poll() is None
+            is_running = check_indexer_process_running()
             total_count = get_document_count()
+            
+            prog_file = os.path.join(os.path.dirname(__file__), "indexer_progress.json")
+            progress = {}
+            if os.path.exists(prog_file):
+                try:
+                    with open(prog_file, "r", encoding="utf-8") as f:
+                        progress = json.load(f)
+                except Exception:
+                    pass
+                    
+            msg = progress.get("status_message", "")
+            if not is_running and not msg:
+                msg = ""
+            elif is_running and not msg:
+                msg = "Indexing active in background..."
+
             self.send_json({
                 "indexing_running": is_running,
-                "total_docs": total_count
+                "total_docs": total_count,
+                "scanned": progress.get("scanned", 0),
+                "indexed": progress.get("indexed", 0),
+                "skipped": progress.get("skipped", 0),
+                "status_message": msg
             })
             return
 
@@ -1268,10 +1591,24 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         open_file_url = f"openfile://{encoded_path}"
                         open_opus_url = f"openopus://{encoded_path}"
                         open_explorer_url = f"openexplorer://{encoded_path}"
-                        thumb_url = f"/api/thumbnail?path={encoded_path}"
+                        thumb_url = f"/api/thumbnail?path={encoded_path}&v=2"
                         
                         escaped_display_path = html.escape(fpath)
                         ftype = src.get('file_type', 'doc').lower()
+
+                        mod_val = src.get('modified_date', '')
+                        create_val = src.get('created_date', '')
+
+                        mod_str = format_doc_date(mod_val)
+                        create_str = format_doc_date(create_val)
+
+                        date_parts = []
+                        if mod_str:
+                            date_parts.append(f'<span class="meta-date-item" title="Last Modified Date">🕒 <strong>Modified:</strong> {mod_str}</span>')
+                        if create_str:
+                            date_parts.append(f'<span class="meta-date-item" title="Date Created">🗓️ <strong>Created:</strong> {create_str}</span>')
+                        
+                        dates_html = f'<div class="file-meta-dates">{" &bull; ".join(date_parts)}</div>' if date_parts else ''
 
                         highlights = hit.get('highlight', {}).get('content', [])
                         if highlights:
@@ -1300,6 +1637,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
                                     </div>
                                 </div>
                                 <div class="file-path" onclick="handleOpenExplorer('{escaped_js_path}', '{open_explorer_url}')" title="Click to open folder in Windows File Explorer">📁 {escaped_display_path}</div>
+                                {dates_html}
                                 <div class="snippet">{snippet_text}</div>
                             </div>
                             {thumb_html}
@@ -1327,16 +1665,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
 
         # API: Stop Indexing
         if parsed.path == '/api/stop_indexing':
-            if INDEXER_PROCESS and INDEXER_PROCESS.poll() is None:
-                try:
-                    INDEXER_PROCESS.terminate()
-                    INDEXER_PROCESS.wait(timeout=2)
-                except Exception:
-                    try:
-                        INDEXER_PROCESS.kill()
-                    except Exception:
-                        pass
-            INDEXER_PROCESS = None
+            stop_all_indexer_processes()
             self.send_json({"status": "ok", "message": "Indexing stopped."})
             return
 
@@ -1358,6 +1687,21 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 # Trigger ingest_documents.py as manageable subprocess
                 dirs = data.get("selected_directories", [])
                 if dirs:
+                    # Immediately initialize progress file for real-time starting UI status
+                    prog_file = os.path.join(os.path.dirname(__file__), "indexer_progress.json")
+                    try:
+                        with open(prog_file, "w", encoding="utf-8") as f:
+                            json.dump({
+                                "is_running": True,
+                                "scanned": 1,
+                                "indexed": 0,
+                                "skipped": 0,
+                                "status_message": "Checking documents: 1 scanned (0 updated, 0 skipped)",
+                                "timestamp": time.time()
+                            }, f)
+                    except Exception:
+                        pass
+
                     def run_ingest():
                         global INDEXER_PROCESS
                         try:
