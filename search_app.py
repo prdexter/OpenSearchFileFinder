@@ -948,12 +948,17 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <div id="treeModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>📁 Select Directories to Index</h3>
+                <h3>📁 Select Directories & Backup Target</h3>
                 <span class="close" onclick="closeTreeModal()">&times;</span>
             </div>
-            <p style="font-size:13px; color:#6c757d; margin-top:0;">Check the folders you want OpenSearch to scan and index across your drives:</p>
+            <p style="font-size:13px; color:#6c757d; margin-top:0;">Check the folders you want OpenSearch to scan across your drives:</p>
             <div class="tree-container" id="treeContainer">
                 Loading drive and directory tree...
+            </div>
+            <div style="margin-top:12px; padding-top:10px; border-top:1px solid #dee2e6;">
+                <label style="font-size:13px; font-weight:bold; color:#495057; display:block; margin-bottom:4px;">🌐 Network Backup Target Path (Optional):</label>
+                <input type="text" id="netTargetInput" placeholder="e.g. \\NAS\Share\Backups or Z:\Backups" style="width:100%; padding:8px 12px; font-size:13px; border:1px solid #ced4da; border-radius:4px; box-sizing:border-box;">
+                <small style="color:#6c757d; font-size:11px; display:block; margin-top:3px;">When configured, local document backups automatically sync to this network destination after indexing completes.</small>
             </div>
             <div class="modal-footer">
                 <span id="statusMsg" style="font-size:13px; font-weight:bold; color:#007bff;"></span>
@@ -968,7 +973,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
         document.addEventListener('DOMContentLoaded', function() {
             checkStatus();
-            setInterval(checkStatus, 3000);
+            setInterval(checkStatus, 1000);
         });
 
         function showToast(msg, isError=false) {
@@ -1084,10 +1089,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                         
                         if (data.status_message) {
                             badge.innerText = '⏳ ' + data.status_message;
-                        } else if (data.scanned > 0) {
-                            badge.innerText = '⏳ Checking files: ' + data.scanned.toLocaleString() + ' scanned (' + data.indexed.toLocaleString() + ' updated, ' + data.skipped.toLocaleString() + ' skipped)';
                         } else {
-                            badge.innerText = '⚡ Live Indexing in Progress...';
+                            badge.innerText = '⚡ Indexing active in background...';
                         }
                     } else {
                         btn.className = 'btn-index';
@@ -1114,11 +1117,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 const cfgRes = await fetch('/api/config');
                 const cfg = await cfgRes.json();
                 const arr = cfg.selected_directories || [];
+                const netTarget = cfg.network_backup_target || '';
 
                 await fetch('/api/config', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({selected_directories: arr})
+                    body: JSON.stringify({selected_directories: arr, network_backup_target: netTarget})
                 });
                 checkStatus();
             }
@@ -1129,6 +1133,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             const cfgRes = await fetch('/api/config');
             const cfg = await cfgRes.json();
             selectedPaths = new Set(cfg.selected_directories || []);
+            const netInput = document.getElementById('netTargetInput');
+            if (netInput) netInput.value = cfg.network_backup_target || '';
             loadDriveTree();
         }
 
@@ -1272,13 +1278,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
         async function saveSelectedDirectories() {
             const arr = Array.from(selectedPaths);
+            const netInput = document.getElementById('netTargetInput');
+            const netTarget = netInput ? netInput.value.trim() : '';
+
             const statusMsg = document.getElementById('statusMsg');
             statusMsg.innerText = 'Saving configuration & starting indexer...';
 
             await fetch('/api/config', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({selected_directories: arr})
+                body: JSON.stringify({selected_directories: arr, network_backup_target: netTarget})
             });
 
             statusMsg.innerText = '✓ Indexer triggered in background!';
@@ -1309,7 +1318,33 @@ def stop_all_indexer_processes():
     INDEXER_PROCESS = None
 
     try:
-        subprocess.run(['powershell', '-Command', "Get-CimInstance Win32_Process -Filter \"name = 'python.exe'\" | Where-Object { $_.CommandLine -like '*ingest_documents.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"], capture_output=True)
+        import psutil
+        for p in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if p.info['name'] and 'python' in p.info['name'].lower():
+                    cmd = p.info['cmdline']
+                    if cmd and any('ingest_documents.py' in arg for arg in cmd):
+                        p.kill()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
+        if sys.platform == 'win32':
+            subprocess.run(["taskkill", "/F", "/IM", "robocopy.exe"], capture_output=True)
+    except Exception:
+        pass
+
+    # Ensure cloud sync is resumed
+    try:
+        if os.path.exists(r"C:\Program Files\Microsoft OneDrive\OneDrive.exe"):
+            subprocess.Popen([r"C:\Program Files\Microsoft OneDrive\OneDrive.exe"])
+    except Exception:
+        pass
+    try:
+        if os.path.exists(r"C:\Program Files (x86)\Dropbox\Client\Dropbox.exe"):
+            subprocess.Popen([r"C:\Program Files (x86)\Dropbox\Client\Dropbox.exe"])
     except Exception:
         pass
 
@@ -1696,7 +1731,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
                                 "scanned": 1,
                                 "indexed": 0,
                                 "skipped": 0,
-                                "status_message": "Checking documents: 1 scanned (0 updated, 0 skipped)",
+                                "status_message": "⚡ Pre-fetching database metadata (takes ~15-30s)...",
                                 "timestamp": time.time()
                             }, f)
                     except Exception:

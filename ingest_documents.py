@@ -501,8 +501,18 @@ def fetch_existing_metadata(client, index_name="documents"):
     existing_map = {}
     if not client.indices.exists(index=index_name):
         return existing_map
-    print("[*] Pre-fetching existing index metadata for fast delta comparison...")
-    write_progress(True, 0, 0, 0, "Pre-fetching metadata from OpenSearch index...")
+
+    total_docs = 0
+    try:
+        res = client.count(index=index_name)
+        total_docs = res.get('count', 0)
+    except Exception:
+        pass
+
+    total_str = f"{total_docs:,}" if total_docs > 0 else "~93k"
+    print(f"[*] Pre-fetching existing index metadata ({total_str} records) for fast delta comparison...")
+    write_progress(True, 0, 0, 0, f"⚡ Pre-fetching database metadata: 0 / {total_str} loaded... (takes ~15-30s)")
+
     try:
         from opensearchpy.helpers import scan
         docs = scan(client, index=index_name, query={"_source": ["file_path", "modified_date", "file_size"]})
@@ -514,12 +524,13 @@ def fetch_existing_metadata(client, index_name="documents"):
             if fp:
                 norm = os.path.normpath(os.path.abspath(fp)).lower()
                 existing_map[norm] = (src.get('modified_date'), src.get('file_size'))
-            if count % 5000 == 0:
-                write_progress(True, 0, 0, 0, f"Loading cached metadata: {count:,} records loaded...")
+            if count % 2000 == 0 or count == total_docs:
+                pct_str = f" ({int(count / total_docs * 100)}%)" if total_docs > 0 else ""
+                write_progress(True, 0, 0, 0, f"⚡ Pre-fetching database metadata: {count:,} / {total_str} loaded{pct_str}... (takes ~15-30s)")
     except Exception as e:
         print(f"[-] Warning: Could not pre-fetch index metadata: {e}")
     print(f"[+] Loaded {len(existing_map):,} cached entries for instant skip check.")
-    write_progress(True, 0, 0, 0, f"Metadata loaded ({len(existing_map):,} entries). Starting file scan...")
+    write_progress(True, 0, 0, 0, f"✅ Metadata loaded ({len(existing_map):,} records). Starting file scan...")
     return existing_map
 
 
@@ -527,6 +538,7 @@ def copy_file_to_backup(file_path: str, backup_dir: str) -> str:
     """
     Mirrors file_path into backup_dir preserving directory structure.
     Returns destination path on success, or None on failure.
+    Fast skip if dest_path exists and has matching size.
     """
     if not backup_dir:
         return None
@@ -534,6 +546,12 @@ def copy_file_to_backup(file_path: str, backup_dir: str) -> str:
         drive, rel_path = os.path.splitdrive(file_path)
         clean_rel = rel_path.lstrip('\\').lstrip('/')
         dest_path = os.path.join(backup_dir, clean_rel)
+        if os.path.exists(dest_path):
+            try:
+                if os.path.getsize(dest_path) == os.path.getsize(file_path):
+                    return dest_path
+            except Exception:
+                pass
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
         import shutil
         shutil.copy2(file_path, dest_path)
@@ -555,7 +573,18 @@ def process_single_file(file_path: str, index_name: str, existing_map: dict = No
         mtime_iso = datetime.fromtimestamp(stat.st_mtime).isoformat()
         file_size = stat.st_size
 
-        # Fast Delta Skip Check: Compare file mtime and file size
+        # Handle Document Backup (Skipping excluded extensions like .csv)
+        backup_dest = None
+        is_backed_up = False
+        if exclude_backup_exts is None:
+            exclude_backup_exts = {'.csv'}
+
+        # Bypass local D:\Backups\Documents for D:\Active research (it syncs directly to NAS in Phase 3)
+        if backup_dir and ext not in exclude_backup_exts and not norm_path.startswith(r"d:\active research"):
+            backup_dest = copy_file_to_backup(file_path, backup_dir)
+            is_backed_up = backup_dest is not None
+
+        # Fast Delta Skip Check: Compare file mtime and file size for OpenSearch indexing
         if not force and existing_map and norm_path in existing_map:
             cached_mtime, cached_size = existing_map[norm_path]
             if cached_mtime == mtime_iso and cached_size == file_size:
@@ -569,16 +598,6 @@ def process_single_file(file_path: str, index_name: str, existing_map: dict = No
         
         # Trigger cover thumbnail generation if missing
         generate_thumbnail_if_missing(file_path, file_type)
-
-        # Handle Document Backup (Skipping excluded extensions like .csv)
-        backup_dest = None
-        is_backed_up = False
-        if exclude_backup_exts is None:
-            exclude_backup_exts = {'.csv'}
-
-        if backup_dir and ext not in exclude_backup_exts:
-            backup_dest = copy_file_to_backup(file_path, backup_dir)
-            is_backed_up = backup_dest is not None
 
         doc = {
             "_op_type": "index",
@@ -645,59 +664,181 @@ def write_progress(is_running: bool, scanned: int, indexed: int, skipped: int, s
         pass
 
 
-def sync_to_network_target(backup_dir: str, network_target: str):
+ALERT_EMAIL_RECIPIENT = "prdexter@iu.edu"
+
+def send_email_alert(subject: str, body_text: str, recipient: str = ALERT_EMAIL_RECIPIENT, smtp_server: str = "mail-relay.iu.edu", smtp_port: int = 25):
+    """
+    Sends an email alert notification to prdexter@iu.edu if SAN backup sync fails.
+    Uses Python smtplib with fallback to PowerShell Send-MailMessage.
+    """
+    print(f"[*] Sending backup failure alert email to {recipient}...")
+    sender = "opensearch-indexer-alert@iu.edu"
+    
+    # Method 1: Python smtplib via IU SMTP relay
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        
+        msg = MIMEText(body_text)
+        msg['Subject'] = subject
+        msg['From'] = sender
+        msg['To'] = recipient
+        
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+            server.send_message(msg)
+        print(f"[✓] Email alert successfully sent to {recipient} via {smtp_server}!")
+        return
+    except Exception as e1:
+        print(f"[-] Standard SMTP relay error ({e1}). Attempting PowerShell mail fallback...")
+
+    # Method 2: PowerShell Send-MailMessage fallback on Windows
+    if sys.platform == 'win32':
+        try:
+            ps_script = f"""
+            $Subject = '{subject}'
+            $Body = '{body_text}'
+            $Smtp = '{smtp_server}'
+            Send-MailMessage -To '{recipient}' -From '{sender}' -Subject $Subject -Body $Body -SmtpServer $Smtp -ErrorAction Stop
+            """
+            subprocess.run(["powershell", "-Command", ps_script], capture_output=True, timeout=10)
+            print(f"[✓] Email alert sent to {recipient} via PowerShell!")
+        except Exception as e2:
+            print(f"[-] Email alert fallback error: {e2}")
+
+
+def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing"):
+    """
+    Runs Robocopy while parsing output stream to update indexer_progress.json in real time.
+    """
+    cmd_filtered = [arg for arg in cmd if arg not in ["/NFL", "/NDL", "/NJH", "/NJS"]]
+    cmd_filtered.extend(["/NDL", "/NJH", "/NJS", "/NC", "/NS", "/NP"])
+    
+    try:
+        proc = subprocess.Popen(cmd_filtered, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, errors='replace')
+    except Exception as e:
+        print(f"[-] Failed to launch Robocopy: {e}")
+        return 16
+
+    copied_count = 0
+    skipped_count = 0
+    last_update = 0
+
+    for line in iter(proc.stdout.readline, ''):
+        line_str = line.strip()
+        if not line_str:
+            continue
+        
+        if any(kw in line_str for kw in ["New File", "Newer", "LONGER", "New Dir", "mismatch"]):
+            copied_count += 1
+        elif any(kw in line_str for kw in ["Same", "Older"]):
+            skipped_count += 1
+        else:
+            if not line_str.startswith("----") and not line_str.startswith("ROBOCOPY"):
+                skipped_count += 1
+        
+        now = time.time()
+        if now - last_update > 0.4:
+            last_update = now
+            msg = f"⚡ Phase 3/3: {label}... ({skipped_count:,} skipped, {copied_count:,} copied)"
+            write_progress(True, skipped_count + copied_count, copied_count, skipped_count, msg)
+
+    proc.stdout.close()
+    returncode = proc.wait()
+    
+    final_msg = f"⚡ Phase 3/3: {label} complete ({skipped_count:,} skipped, {copied_count:,} copied)"
+    write_progress(True, skipped_count + copied_count, copied_count, skipped_count, final_msg)
+    return returncode
+
+
+def sync_to_network_target(backup_dir: str, network_target: str, net_user: str = None, net_pass: str = None, alert_email: str = ALERT_EMAIL_RECIPIENT, smtp_server: str = "mail-relay.iu.edu"):
     if not backup_dir or not os.path.exists(backup_dir):
         print(f"[-] Backup directory '{backup_dir}' does not exist. Skipping network copy.")
         return
     if not network_target:
         return
 
-    print(f"\n[*] Starting backup sync from '{backup_dir}' to network target '{network_target}'...")
+    print(f"\n[*] Starting backup sync from '{backup_dir}' to network target '{network_target}' (Max retries: 1)...")
+    import subprocess
+    if sys.platform == 'win32' and net_user and net_pass:
+        try:
+            # Authenticate SMB share using net use if credentials provided
+            share_root = network_target.split('\\')[0:4]
+            share_path = "\\".join([p for p in share_root if p])
+            if share_path.startswith('\\\\'):
+                subprocess.run(["net", "use", share_path, net_pass, f"/user:{net_user}"], capture_output=True, timeout=5)
+        except Exception:
+            pass
+
+    sync_failed = False
+    failure_reason = ""
+
     try:
         os.makedirs(network_target, exist_ok=True)
-        import subprocess
         if sys.platform == 'win32':
-            cmd = ["robocopy", backup_dir, network_target, "/MIR", "/FFT", "/R:2", "/W:2", "/NDL", "/NFL", "/NJH"]
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            if res.returncode <= 7:
+            # Enforce /R:1 (max 1 retry attempt), multi-threading (/MT:16), exclude temp/cache dirs
+            cmd = ["robocopy", backup_dir, network_target, "/MIR", "/FFT", "/R:1", "/W:2", "/MT:16", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
+            code = run_robocopy_with_live_progress(cmd, label=f"Syncing backups to '{network_target}'")
+            if code <= 7:
                 print(f"[✓] Network backup sync complete to '{network_target}'!")
-            else:
-                print(f"[-] Robocopy returned code {res.returncode}: {res.stderr or res.stdout}")
-        else:
-            for root, _, files in os.walk(backup_dir):
-                rel = os.path.relpath(root, backup_dir)
-                dest = os.path.join(network_target, rel)
-                os.makedirs(dest, exist_ok=True)
-                for f in files:
-                    s_file = os.path.join(root, f)
-                    d_file = os.path.join(dest, f)
-                    if not os.path.exists(d_file) or os.path.getmtime(s_file) > os.path.getmtime(d_file):
-                        import shutil
-                        shutil.copy2(s_file, d_file)
-            print(f"[✓] Network backup sync complete to '{network_target}'!")
+            
+        # Direct NAS Sync for D:\Active research (ALL file types directly to NAS)
+        active_res_src = r"D:\Active research"
+        if os.path.exists(active_res_src):
+            print(f"[*] Syncing ALL file types from '{active_res_src}' directly to NAS target...")
+            active_res_nas = os.path.join(network_target, "Active research")
+            os.makedirs(active_res_nas, exist_ok=True)
+            if sys.platform == 'win32':
+                cmd_ar = ["robocopy", active_res_src, active_res_nas, "/MIR", "/FFT", "/R:1", "/W:2", "/MT:16", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
+                returncode_ar = run_robocopy_with_live_progress(cmd_ar, label=f"Syncing Active research to '{active_res_nas}'")
+                if returncode_ar <= 7:
+                    print(f"[✓] Direct Active research NAS sync complete to '{active_res_nas}'!")
+                else:
+                    print(f"[-] Robocopy code {returncode_ar} during direct Active research NAS sync.")
     except Exception as e:
-        print(f"[-] Network backup sync error: {e}")
+        sync_failed = True
+        failure_reason = str(e)
+        print(f"[-] Network backup sync failed: {e}")
+
+    if sync_failed:
+        recipient = alert_email or ALERT_EMAIL_RECIPIENT
+        subject = "⚠️ OpenSearch Backup Alert: SAN Target Sync Failed"
+        body = f"""OpenSearch Document Indexer Alert
+
+The automatic backup sync to your SAN network target could not be written.
+
+Network Target Path: {network_target}
+Local Backup Path: {backup_dir}
+Timestamp: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+Max Retries Attempted: 1
+
+Failure Details:
+{failure_reason}
+
+Note: Your local OpenSearch database index and primary local backups (on {backup_dir}) remain 100% safe and intact.
+"""
+        send_email_alert(subject, body, recipient=recipient, smtp_server=smtp_server)
 
 
-def backup_full_dropbox(dropbox_src: str, backup_dir: str):
-    if not os.path.exists(dropbox_src) or not backup_dir:
+def backup_full_directory(src_dir: str, backup_dir: str):
+    if not os.path.exists(src_dir) or not backup_dir:
         return
-    print(f"\n[*] Performing FULL backup of Dropbox ({dropbox_src}) into '{backup_dir}' (including ALL file types)...")
-    dest_dir = os.path.join(backup_dir, "Dropbox")
+    print(f"\n[*] Performing FULL backup of '{src_dir}' into '{backup_dir}' (including ALL file types)...")
+    drive, rel_path = os.path.splitdrive(src_dir)
+    clean_rel = rel_path.lstrip('\\').lstrip('/')
+    dest_dir = os.path.join(backup_dir, clean_rel)
     os.makedirs(dest_dir, exist_ok=True)
     try:
         import subprocess
         if sys.platform == 'win32':
-            cmd = ["robocopy", dropbox_src, dest_dir, "/MIR", "/FFT", "/R:2", "/W:2", "/XD", ".dropbox.cache", "dropboxbackup", "/NDL", "/NFL", "/NJH"]
-            res = subprocess.run(cmd, capture_output=True, text=True)
-            if res.returncode <= 7:
-                print(f"[✓] Full Dropbox backup complete to '{dest_dir}'!")
+            cmd = ["robocopy", src_dir, dest_dir, "/MIR", "/FFT", "/R:2", "/W:2", "/MT:16", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
+            res_code = run_robocopy_with_live_progress(cmd, label=f"Full backup '{os.path.basename(src_dir)}'")
+            if res_code <= 7:
+                print(f"[✓] Full backup complete for '{src_dir}' -> '{dest_dir}'!")
             else:
-                print(f"[-] Robocopy Dropbox backup code {res.returncode}: {res.stderr or res.stdout}")
+                print(f"[-] Robocopy backup code {res_code} for '{src_dir}'")
         else:
-            for root, dirs, files in os.walk(dropbox_src):
-                dirs[:] = [d for d in dirs if d.lower() not in ('.dropbox.cache', 'dropboxbackup')]
-                rel = os.path.relpath(root, dropbox_src)
+            for root, dirs, files in os.walk(src_dir):
+                rel = os.path.relpath(root, src_dir)
                 dest = os.path.join(dest_dir, rel)
                 os.makedirs(dest, exist_ok=True)
                 for f in files:
@@ -706,9 +847,53 @@ def backup_full_dropbox(dropbox_src: str, backup_dir: str):
                     if not os.path.exists(d_file) or os.path.getmtime(s_file) > os.path.getmtime(d_file):
                         import shutil
                         shutil.copy2(s_file, d_file)
-            print(f"[✓] Full Dropbox backup complete to '{dest_dir}'!")
+            print(f"[✓] Full backup complete for '{src_dir}' -> '{dest_dir}'!")
     except Exception as e:
-        print(f"[-] Full Dropbox backup error: {e}")
+        print(f"[-] Full backup error for '{src_dir}': {e}")
+
+
+ONEDRIVE_EXE = r"C:\Program Files\Microsoft OneDrive\OneDrive.exe"
+DROPBOX_EXE = r"C:\Program Files (x86)\Dropbox\Client\Dropbox.exe"
+
+
+def pause_cloud_sync():
+    """Stops OneDrive and Dropbox sync processes completely during indexing to prevent file locks."""
+    print("[*] Pausing OneDrive & Dropbox sync processes during indexing...")
+    import subprocess
+    # Shutdown OneDrive cleanly first
+    for odp in [r"C:\Program Files\Microsoft OneDrive\OneDrive.exe", os.path.expanduser(r"~\AppData\Local\Microsoft\OneDrive\OneDrive.exe")]:
+        if os.path.exists(odp):
+            try:
+                subprocess.run([odp, "/shutdown"], capture_output=True, timeout=5)
+            except Exception:
+                pass
+
+    # Force kill any remaining sync processes
+    for proc in ["OneDrive.exe", "OneDrive.Sync.Service.exe", "Dropbox.exe"]:
+        try:
+            subprocess.run(["taskkill", "/F", "/T", "/IM", proc], capture_output=True, timeout=5)
+        except Exception:
+            pass
+
+
+def resume_cloud_sync():
+    """Resumes OneDrive and Dropbox sync processes after indexing completes."""
+    print("[✓] Resuming OneDrive & Dropbox sync...")
+    import subprocess
+    for odp in [r"C:\Program Files\Microsoft OneDrive\OneDrive.exe", os.path.expanduser(r"~\AppData\Local\Microsoft\OneDrive\OneDrive.exe")]:
+        if os.path.exists(odp):
+            try:
+                subprocess.Popen([odp, "/background"])
+                break
+            except Exception:
+                pass
+
+    dropbox_exe = r"C:\Program Files (x86)\Dropbox\Client\Dropbox.exe"
+    if os.path.exists(dropbox_exe):
+        try:
+            subprocess.Popen([dropbox_exe])
+        except Exception:
+            pass
 
 
 def main():
@@ -719,148 +904,165 @@ def main():
     parser.add_argument("--backup-dir", default=None, help="Target directory for document backups")
     parser.add_argument("--exclude-backup-ext", nargs="*", default=None, help="File extensions to exclude from backup (e.g. .csv)")
     parser.add_argument("--network-target", default=None, help="Optional network target directory to sync backups to when complete")
+    parser.add_argument("--no-pause-sync", action="store_true", help="Disable automatic pausing of OneDrive and Dropbox during indexing")
     args = parser.parse_args()
 
-    config_backup_dir = r"D:\Backups\Documents"
-    config_exclude_exts = [".csv"]
+    if not args.no_pause_sync:
+        pause_cloud_sync()
 
-    config_path = os.path.join(os.path.dirname(__file__), "indexer_config.json")
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
-                if not args.dir:
-                    args.dir = cfg.get("selected_directories", [r"D:\Active research"])
-                config_backup_dir = cfg.get("backup_directory", r"D:\Backups\Documents")
-                config_exclude_exts = cfg.get("exclude_backup_extensions", [".csv"])
-        except Exception:
-            pass
+    try:
+        config_backup_dir = r"D:\Backups\Documents"
+        config_exclude_exts = [".csv"]
+        config_network_target = None
 
-    if not args.dir:
-        args.dir = [r"D:\Active research"]
+        config_path = os.path.join(os.path.dirname(__file__), "indexer_config.json")
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    if not args.dir:
+                        args.dir = cfg.get("selected_directories", [r"D:\Active research"])
+                    config_backup_dir = cfg.get("backup_directory", r"D:\Backups\Documents")
+                    config_exclude_exts = cfg.get("exclude_backup_extensions", [".csv"])
+                    config_network_target = cfg.get("network_backup_target", None)
+            except Exception:
+                pass
 
-    backup_dir = args.backup_dir or config_backup_dir
-    raw_exclude_exts = args.exclude_backup_ext if args.exclude_backup_ext is not None else config_exclude_exts
-    exclude_backup_exts = {ext.lower() if ext.startswith('.') else f".{ext.lower()}" for ext in raw_exclude_exts}
+        if not args.dir:
+            args.dir = [r"D:\Active research"]
 
-    print(f"[*] Ingestion starting for directories: {args.dir} (Force mode: {args.force})")
-    if backup_dir:
-        print(f"[*] Document Backup Enabled -> Destination: '{backup_dir}' (Excluding: {sorted(list(exclude_backup_exts))})")
-    else:
-        print(f"[*] Document Backup Disabled (Set 'backup_directory' in indexer_config.json or use --backup-dir)")
+        backup_dir = args.backup_dir or config_backup_dir
+        raw_exclude_exts = args.exclude_backup_ext if args.exclude_backup_ext is not None else config_exclude_exts
+        exclude_backup_exts = {ext.lower() if ext.startswith('.') else f".{ext.lower()}" for ext in raw_exclude_exts}
 
-    client = get_opensearch_client()
-    ensure_index_exists(client, index_name=args.index)
+        print(f"[*] Ingestion starting for directories: {args.dir} (Force mode: {args.force})")
+        if backup_dir:
+            print(f"[*] Document Backup Enabled -> Destination: '{backup_dir}' (Excluding: {sorted(list(exclude_backup_exts))})")
+        else:
+            print(f"[*] Document Backup Disabled (Set 'backup_directory' in indexer_config.json or use --backup-dir)")
 
-    existing_map = fetch_existing_metadata(client, index_name=args.index) if not args.force else {}
+        client = get_opensearch_client()
+        ensure_index_exists(client, index_name=args.index)
 
-    start_time = time.time()
-    batch = []
-    total_scanned = 0
-    total_indexed = 0
-    total_skipped = 0
-    scanned_paths = set()
+        existing_map = fetch_existing_metadata(client, index_name=args.index) if not args.force else {}
 
-    # Initialize status file at start of scan
-    write_progress(True, 1, 0, 0, "Checking files: 1 scanned (0 updated, 0 skipped)")
+        start_time = time.time()
+        batch = []
+        total_scanned = 0
+        total_indexed = 0
+        total_skipped = 0
+        scanned_paths = set()
 
-    from concurrent.futures import wait, FIRST_COMPLETED
+        from concurrent.futures import wait, FIRST_COMPLETED
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = set()
-        max_queue = 32
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = set()
+            max_queue = 32
 
-        def handle_finished_future(fut):
-            nonlocal total_scanned, total_indexed, total_skipped, batch
-            doc, status = fut.result()
-            if status == 'skipped':
-                total_skipped += 1
-                total_scanned += 1
-            elif status == 'indexed' or doc:
-                total_scanned += 1
-                if doc:
-                    batch.append(doc)
+            def handle_finished_future(fut):
+                nonlocal total_scanned, total_indexed, total_skipped, batch
+                doc, status = fut.result()
+                if status == 'skipped':
+                    total_skipped += 1
+                    total_scanned += 1
+                elif status == 'indexed' or doc:
+                    total_scanned += 1
+                    if doc:
+                        batch.append(doc)
 
-            if total_scanned % 10 == 0 or len(batch) >= 20:
-                msg = f"Checking documents: {total_scanned:,} scanned ({total_indexed:,} updated, {total_skipped:,} skipped)"
-                write_progress(True, total_scanned, total_indexed, total_skipped, msg)
+                if total_scanned % 10 == 0 or len(batch) >= 20:
+                    msg = f"🔍 Scanning documents: {total_scanned:,} scanned ({total_indexed:,} updated, {total_skipped:,} unchanged)"
+                    write_progress(True, total_scanned, total_indexed, total_skipped, msg)
 
-            if len(batch) >= 20:
+                if len(batch) >= 20:
+                    try:
+                        helpers.bulk(client, batch)
+                        client.indices.refresh(index=args.index)
+                        total_indexed += len(batch)
+                        print(f"[+] Bulk indexed {total_indexed} new/updated documents ({total_skipped:,} skipped unmodified)...")
+                    except Exception as e:
+                        print(f"[-] Bulk ingest error: {e}")
+                    batch = []
+
+            for file_path in scan_directories(args.dir):
+                norm_p = os.path.normpath(os.path.abspath(file_path)).lower()
+                scanned_paths.add(norm_p)
+                
+                while len(futures) >= max_queue:
+                    done, futures = wait(futures, return_when=FIRST_COMPLETED)
+                    for fut in done:
+                        handle_finished_future(fut)
+
+                futures.add(executor.submit(process_single_file, file_path, args.index, existing_map, args.force, backup_dir, exclude_backup_exts))
+
+            # Flush remaining futures with timeout safety
+            if futures:
+                done, not_done = wait(futures, timeout=15)
+                for fut in done:
+                    try:
+                        handle_finished_future(fut)
+                    except Exception:
+                        pass
+                if not_done:
+                    print(f"[-] Warning: {len(not_done)} indexing threads timed out and were skipped.")
+
+            if batch:
                 try:
                     helpers.bulk(client, batch)
                     client.indices.refresh(index=args.index)
                     total_indexed += len(batch)
-                    print(f"[+] Bulk indexed {total_indexed} new/updated documents ({total_skipped:,} skipped unmodified)...")
-                except Exception as e:
-                    print(f"[-] Bulk ingest error: {e}")
-                batch = []
-
-        for file_path in scan_directories(args.dir):
-            norm_p = os.path.normpath(os.path.abspath(file_path)).lower()
-            scanned_paths.add(norm_p)
-            
-            while len(futures) >= max_queue:
-                done, futures = wait(futures, return_when=FIRST_COMPLETED)
-                for fut in done:
-                    handle_finished_future(fut)
-
-            futures.add(executor.submit(process_single_file, file_path, args.index, existing_map, args.force, backup_dir, exclude_backup_exts))
-
-        # Flush remaining futures with timeout safety
-        if futures:
-            done, not_done = wait(futures, timeout=15)
-            for fut in done:
-                try:
-                    handle_finished_future(fut)
                 except Exception:
                     pass
-            if not_done:
-                print(f"[-] Warning: {len(not_done)} indexing threads timed out and were skipped.")
 
-        if batch:
-            try:
-                helpers.bulk(client, batch)
+        # Ghost / Dead File Cleanup Pass
+        total_deleted = 0
+        if not args.force and existing_map:
+            dead_paths = set(existing_map.keys()) - scanned_paths
+            if dead_paths:
+                print(f"[*] Cleaning up {len(dead_paths):,} deleted or moved documents from index...")
+                for fp in dead_paths:
+                    try:
+                        doc_id = hashlib.sha256(fp.encode('utf-8')).hexdigest()
+                        client.delete(index=args.index, id=doc_id, ignore=[404])
+                        total_deleted += 1
+                    except Exception:
+                        pass
                 client.indices.refresh(index=args.index)
-                total_indexed += len(batch)
-            except Exception:
-                pass
 
-    # Ghost / Dead File Cleanup Pass
-    total_deleted = 0
-    if not args.force and existing_map:
-        dead_paths = set(existing_map.keys()) - scanned_paths
-        if dead_paths:
-            print(f"[*] Cleaning up {len(dead_paths):,} deleted or moved documents from index...")
-            for fp in dead_paths:
+        elapsed = time.time() - start_time
+        print(f"[+] Hybrid Indexing Complete! {total_scanned:,} files checked ({total_indexed:,} indexed/updated, {total_skipped:,} unmodified/skipped, {total_deleted:,} dead entries cleaned up) in {elapsed:.2f} seconds.")
+
+        # Phase 2: Full Directory Special Exceptions Phase (includes ALL file types for Endnote & Quicken)
+        if backup_dir:
+            full_backup_sources = [
+                r"C:\Users\Paul Dexter\OneDrive\Endnote",
+                r"C:\Users\Paul Dexter\OneDrive\Finances and family\Quicken"
+            ]
+            for src in full_backup_sources:
+                folder_name = os.path.basename(src)
+                write_progress(True, total_scanned, total_indexed, total_skipped, f"⚡ Phase 2/3: Full backup of '{folder_name}' (all file types)...")
+                backup_full_directory(src, backup_dir)
+
+        # Phase 3: Optional Network Backup Sync Phase
+        if backup_dir and os.path.exists(backup_dir):
+            net_target = args.network_target or config_network_target
+            if not net_target and sys.stdin.isatty():
                 try:
-                    client.delete_by_query(index=args.index, body={"query": {"term": {"file_path": fp}}})
-                    total_deleted += 1
-                except Exception:
-                    pass
-            client.indices.refresh(index=args.index)
-
-    elapsed = time.time() - start_time
-    final_msg = f"[+] Indexing Complete: {total_scanned:,} documents checked ({total_indexed:,} updated, {total_skipped:,} up-to-date)"
-    write_progress(False, total_scanned, total_indexed, total_skipped, final_msg)
-    print(f"[+] Hybrid Indexing Complete! {total_scanned:,} files checked ({total_indexed:,} indexed/updated, {total_skipped:,} unmodified/skipped, {total_deleted:,} dead entries cleaned up) in {elapsed:.2f} seconds.")
-
-    # Full Dropbox Backup Phase (includes ALL files in D:\Dropbox)
-    if backup_dir:
-        backup_full_dropbox(r"D:\Dropbox", backup_dir)
-
-    # Optional Network Backup Sync Phase
-    if backup_dir and os.path.exists(backup_dir):
-        net_target = args.network_target
-        if not net_target and sys.stdin.isatty():
-            try:
-                ans = input("\n[?] Ingestion and local backup complete. Would you like to save/sync backups to a network target? (y/N): ").strip().lower()
-                if ans in ['y', 'yes']:
-                    net_target = input("[?] Enter network target path (e.g. \\\\NAS\\Share\\Backups or Z:\\Backups): ").strip()
-            except (KeyboardInterrupt, EOFError):
-                net_target = None
+                    ans = input("\n[?] Ingestion and local backup complete. Would you like to save/sync backups to a network target? (y/N): ").strip().lower()
+                    if ans in ['y', 'yes']:
+                        net_target = input("[?] Enter network target path (e.g. \\\\NAS\\Share\\Backups or Z:\\Backups): ").strip()
+                except (KeyboardInterrupt, EOFError):
+                    net_target = None
+            
+            if net_target:
+                write_progress(True, total_scanned, total_indexed, total_skipped, f"⚡ Phase 3/3: Syncing backups to network target '{net_target}'...")
+                sync_to_network_target(backup_dir, net_target)
         
-        if net_target:
-            sync_to_network_target(backup_dir, net_target)
+        final_msg = f"✅ All Phases Complete ({total_scanned:,} docs checked, backups synced)!"
+        write_progress(False, total_scanned, total_indexed, total_skipped, final_msg)
+    finally:
+        if not args.no_pause_sync:
+            resume_cloud_sync()
 
 
 if __name__ == "__main__":

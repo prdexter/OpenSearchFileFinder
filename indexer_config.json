@@ -2,10 +2,13 @@
   "selected_directories": [
     "D:\\Active research",
     "C:\\Users\\Paul Dexter\\OneDrive",
+    "C:\\Users\\Paul Dexter\\OneDrive\\Finances and family\\Quicken",
+    "C:\\Users\\Paul Dexter\\OneDrive\\Endnote",
+    "D:\\Quicken",
+    "D:\\Endnote",
     "D:\\Dropbox"
   ],
-  "backup_directory": "D:\\Backups\\Documents\\",
-  "exclude_backup_extensions": [
-    ".csv"
-  ]
+  "network_backup_target": "\\\\Synology_NAS\\Videos and pics\\Backup",
+  "quicken_backup_target": "\\\\Synology_NAS\\Videos and pics\\Quicken",
+  "endnote_backup_target": "\\\\Synology_NAS\\Videos and pics\\Endnote"
 }

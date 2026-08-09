@@ -12,3 +12,4 @@ capture_*.ps1
 cap.ps1
 check_*.py
 test_*.py
+*.log
