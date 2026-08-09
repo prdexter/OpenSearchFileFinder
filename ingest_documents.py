@@ -78,7 +78,8 @@ DEFAULT_EXCLUDE_NAMES = {
 DEFAULT_EXCLUDE_DIRS = {
     r'c:\windows', r'c:\program files', r'c:\program files (x86)',
     r'c:\programdata', r'$recycle.bin', r'system volume information',
-    r'd:\active research\deidentifier\identified', r'deidentifier\identified'
+    r'd:\active research\deidentifier\identified', r'deidentifier\identified',
+    r'd:\quicken', r'd:\endnote', r'd:\backups', r'd:\backups\documents'
 }
 
 # File extensions to strictly SKIP
