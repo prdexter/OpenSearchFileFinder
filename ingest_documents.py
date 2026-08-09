@@ -79,7 +79,9 @@ DEFAULT_EXCLUDE_DIRS = {
     r'c:\windows', r'c:\program files', r'c:\program files (x86)',
     r'c:\programdata', r'$recycle.bin', r'system volume information',
     r'd:\active research\deidentifier\identified', r'deidentifier\identified',
-    r'd:\quicken', r'd:\endnote', r'd:\backups', r'd:\backups\documents'
+    r'd:\quicken', r'd:\endnote', r'd:\backups', r'd:\backups\documents',
+    r'd:\glhs audit and feedback', r'd:\outlook files', r'd:\home videos and pictures',
+    r'd:\pictures backup april 2010', r'd:\disparities project', r'd:\dtsearch index'
 }
 
 # File extensions to strictly SKIP
