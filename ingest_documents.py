@@ -817,7 +817,8 @@ def get_latest_file_info(source_dir: str):
                 for f in files:
                     fp = os.path.join(root, f)
                     try:
-                        mt = os.path.getmtime(fp)
+                        win_fp = "\\\\?\\" + os.path.abspath(fp) if sys.platform == 'win32' else fp
+                        mt = os.path.getmtime(win_fp)
                         if mt > latest_time:
                             latest_time = mt
                             latest_file = fp
