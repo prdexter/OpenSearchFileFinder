@@ -25,7 +25,10 @@ import time
 import hashlib
 import argparse
 import threading
+import subprocess
 import zipfile
+import tempfile
+import ctypes
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -104,17 +107,58 @@ if not os.path.exists(THUMB_CACHE_DIR):
     os.makedirs(THUMB_CACHE_DIR, exist_ok=True)
 
 
+def safe_read_bytes(file_path):
+    """
+    Safely reads bytes from a file even if locked exclusively by Word/Excel/PowerPoint/OneDrive.
+    """
+    if not os.path.exists(file_path):
+        return None
+    try:
+        with open(file_path, 'rb') as f:
+            return f.read()
+    except PermissionError:
+        tmp_dir = tempfile.gettempdir()
+        tmp_name = f"opensearch_lock_{os.getpid()}_{os.path.basename(file_path)}"
+        tmp_path = os.path.join(tmp_dir, tmp_name)
+        try:
+            res = ctypes.windll.kernel32.CopyFileW(file_path, tmp_path, False)
+            if res != 0:
+                with open(tmp_path, 'rb') as f:
+                    data = f.read()
+                return data
+        except Exception:
+            pass
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return None
+
+
 def get_thumbnail_hash(file_path):
     norm = os.path.normpath(os.path.abspath(file_path)).lower()
     return hashlib.md5(norm.encode('utf-8')).hexdigest()
 
 
 def generate_fast_docx_cover(file_path, cache_path):
-    if mammoth is not None and Html2Image is not None:
+    file_bytes = safe_read_bytes(file_path)
+    if file_bytes and mammoth is not None and Html2Image is not None:
         try:
-            with open(file_path, 'rb') as docx_file:
-                res = mammoth.convert_to_html(docx_file)
-                html_body = res.value[:50000] if res.value else ""
+            res = mammoth.convert_to_html(io.BytesIO(file_bytes))
+            raw_html = res.value or ""
+
+            # Safely slice at valid tag boundary so base64 <img src="data:image..."> tags are never chopped in half
+            if len(raw_html) > 600000:
+                cut_pos = raw_html.rfind('</p>', 0, 600000)
+                if cut_pos == -1:
+                    cut_pos = raw_html.rfind('>', 0, 600000)
+                html_body = raw_html[:cut_pos+4] if cut_pos != -1 else raw_html[:600000]
+            else:
+                html_body = raw_html
 
             if html_body and len(html_body.strip()) > 0:
                 html_content = f"""<!DOCTYPE html>
@@ -130,6 +174,7 @@ tr:nth-child(even) {{ background-color: #f8f9fa; }}
 tr:first-child {{ background-color: #e9ecef; font-weight: bold; }}
 h1, h2, h3, h4, h5, h6 {{ margin-top: 0; color: #111; }}
 p {{ margin-bottom: 1rem; }}
+img {{ max-width: 100%; height: auto; display: block; margin: 12px 0; border-radius: 4px; }}
 </style>
 </head>
 <body>
@@ -153,16 +198,17 @@ p {{ margin-bottom: 1rem; }}
 
     file_name = os.path.basename(file_path)
     snippet = ""
-    try:
-        with zipfile.ZipFile(file_path) as z:
-            if 'word/document.xml' in z.namelist():
-                xml_content = z.read('word/document.xml')
-                tree = ET.fromstring(xml_content)
-                text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
-                full_text = " ".join([node.text for node in text_nodes if node.text])
-                snippet = full_text[:400]
-    except Exception:
-        pass
+    if file_bytes:
+        try:
+            with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+                if 'word/document.xml' in z.namelist():
+                    xml_content = z.read('word/document.xml')
+                    tree = ET.fromstring(xml_content)
+                    text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
+                    full_text = " ".join([node.text for node in text_nodes if node.text])
+                    snippet = full_text[:400]
+        except Exception:
+            pass
 
     img = Image.new('RGB', (600, 720), color='#ffffff')
     draw = ImageDraw.Draw(img)
@@ -383,15 +429,99 @@ def generate_fast_pptx_cover(file_path, cache_path):
     canvas.save(cache_path, 'JPEG', quality=95)
 
 
-def generate_thumbnail_if_missing(file_path: str, ext: str):
+def generate_fast_xlsx_cover(file_path, cache_path):
+    file_name = os.path.basename(file_path)
+    snippet = ""
     try:
+        if zipfile.is_zipfile(file_path):
+            with zipfile.ZipFile(file_path) as z:
+                if 'xl/sharedStrings.xml' in z.namelist():
+                    xml_content = z.read('xl/sharedStrings.xml')
+                    tree = ET.fromstring(xml_content)
+                    text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t')
+                    full_text = "  |  ".join([node.text for node in text_nodes if node.text])
+                    snippet = full_text[:400]
+    except Exception:
+        pass
+
+    img = Image.new('RGB', (600, 720), color='#ffffff')
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([0, 0, 599, 719], outline='#dee2e6', width=2)
+    draw.rectangle([0, 0, 600, 18], fill='#28a745')
+    draw.rectangle([0, 18, 600, 110], fill='#f8f9fa')
+
+    draw.text((30, 38), "MICROSOFT EXCEL SPREADSHEET", fill='#6c757d')
+    draw.text((30, 65), file_name[:42], fill='#28a745')
+
+    draw.rectangle([30, 140, 570, 143], fill='#28a745')
+    draw.rectangle([30, 160, 36, 680], fill='#28a745')
+
+    y = 165
+    if snippet:
+        lines = [snippet[i:i+42] for i in range(0, len(snippet), 42)]
+        for line in lines[:18]:
+            draw.text((50, y), line, fill='#333333')
+            y += 26
+    else:
+        draw.text((50, 165), "(Excel Spreadsheet Preview)", fill='#6c757d')
+
+    img.save(cache_path, 'JPEG', quality=90)
+
+
+def generate_fast_text_cover(file_path, cache_path, ftype):
+    file_name = os.path.basename(file_path)
+    snippet = ""
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            snippet = f.read(500)
+    except Exception:
+        pass
+
+    color = '#6f42c1' if ftype in ('md', 'txt', 'rtf') else '#17a2b8'
+    img = Image.new('RGB', (600, 720), color='#ffffff')
+    draw = ImageDraw.Draw(img)
+
+    draw.rectangle([0, 0, 599, 719], outline='#dee2e6', width=2)
+    draw.rectangle([0, 0, 600, 18], fill=color)
+    draw.rectangle([0, 18, 600, 110], fill='#f8f9fa')
+
+    draw.text((30, 38), f"{ftype.upper()} DOCUMENT", fill='#6c757d')
+    draw.text((30, 65), file_name[:42], fill=color)
+
+    draw.rectangle([30, 140, 570, 143], fill=color)
+    draw.rectangle([30, 160, 36, 680], fill=color)
+
+    y = 165
+    if snippet:
+        lines = snippet.splitlines()
+        for line in lines[:18]:
+            draw.text((50, y), line[:45], fill='#333333')
+            y += 26
+            if y > 650:
+                break
+    else:
+        draw.text((50, 165), f"({ftype.upper()} Document Preview)", fill='#6c757d')
+
+    img.save(cache_path, 'JPEG', quality=90)
+
+
+def generate_thumbnail_if_missing(file_path: str, ext: str, force: bool = False):
+    if not os.path.exists(file_path):
+        return
+    try:
+        ext_clean = ext.lstrip('.').lower()
         file_hash = get_thumbnail_hash(file_path)
         cache_path = os.path.join(THUMB_CACHE_DIR, f"{file_hash}.jpg")
 
-        if os.path.exists(cache_path):
-            return
+        if not force and os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+            try:
+                if os.path.getmtime(cache_path) >= os.path.getmtime(file_path):
+                    return
+            except Exception:
+                pass
 
-        if ext == '.pdf':
+        if ext_clean == 'pdf':
             doc = fitz.open(file_path)
             if len(doc) > 0:
                 page = doc[0]
@@ -399,13 +529,20 @@ def generate_thumbnail_if_missing(file_path: str, ext: str):
                 pix.save(cache_path)
                 doc.close()
 
-        elif ext in ('.docx', '.doc'):
+        elif ext_clean in ('docx', 'doc'):
             generate_fast_docx_cover(file_path, cache_path)
 
-        elif ext in ('.pptx', '.ppt'):
+        elif ext_clean in ('pptx', 'ppt'):
             generate_fast_pptx_cover(file_path, cache_path)
+
+        elif ext_clean in ('xlsx', 'xls'):
+            generate_fast_xlsx_cover(file_path, cache_path)
+
+        elif ext_clean in ('txt', 'md', 'csv', 'rtf'):
+            generate_fast_text_cover(file_path, cache_path, ext_clean)
     except Exception:
         pass
+
 
 
 def get_opensearch_client(host="localhost", port=9200):
@@ -456,16 +593,19 @@ def extract_file_content(file_path: str, max_bytes: int = 1_000_000) -> str:
     if ext in SKIP_EXTENSIONS or not ext:
         return ""
         
+    data = safe_read_bytes(file_path)
+    if not data:
+        return ""
+
     if ext in ['.txt', '.md', '.rtf']:
         try:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                return f.read(max_bytes)
+            return data[:max_bytes].decode('utf-8', errors='ignore')
         except Exception:
             return ""
 
     elif ext == '.pdf':
         try:
-            doc = fitz.open(file_path)
+            doc = fitz.open(stream=data, filetype="pdf")
             text_parts = []
             for i, page in enumerate(doc):
                 if i >= 50:
@@ -478,16 +618,29 @@ def extract_file_content(file_path: str, max_bytes: int = 1_000_000) -> str:
         except Exception:
             return ""
 
-    elif ext in ['.docx', '.doc'] and docx is not None:
+    elif ext in ['.docx', '.doc']:
         try:
-            doc = docx.Document(file_path)
-            return "\n".join([p.text for p in doc.paragraphs if p.text])[:max_bytes]
+            with zipfile.ZipFile(io.BytesIO(data)) as z:
+                if 'word/document.xml' in z.namelist():
+                    xml_content = z.read('word/document.xml')
+                    tree = ET.fromstring(xml_content)
+                    text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
+                    full_text = " ".join([node.text for node in text_nodes if node.text])
+                    if full_text:
+                        return full_text[:max_bytes]
         except Exception:
-            return ""
+            pass
+        if docx is not None:
+            try:
+                doc = docx.Document(io.BytesIO(data))
+                return "\n".join([p.text for p in doc.paragraphs if p.text])[:max_bytes]
+            except Exception:
+                pass
+        return ""
 
     elif ext in ['.xlsx', '.xls']:
         try:
-            with zipfile.ZipFile(file_path) as z:
+            with zipfile.ZipFile(io.BytesIO(data)) as z:
                 if 'xl/sharedStrings.xml' in z.namelist():
                     xml_content = z.read('xl/sharedStrings.xml')
                     tree = ET.fromstring(xml_content)
@@ -631,7 +784,8 @@ def is_excluded_dir(dir_path: str) -> bool:
         return True
         
     for excl in DEFAULT_EXCLUDE_DIRS:
-        if excl in norm_path:
+        excl_norm = excl.lower().replace('\\', '/')
+        if excl_norm in norm_path:
             return True
     return False
 
@@ -649,9 +803,37 @@ def scan_directories(target_dirs: list):
                 yield file_path
 
 
+def get_latest_file_info(source_dir: str):
+    """
+    Returns (basename, formatted_mtime_str, full_path) for the single most recently modified file in source_dir.
+    """
+    latest_time = 0
+    latest_file = None
+    if source_dir and os.path.exists(source_dir):
+        try:
+            for root, dirs, files in os.walk(source_dir):
+                if any(skip in root.lower() for skip in ['__pycache__', '.git', 'node_modules', '.venv', '.cache', 'appdata']):
+                    continue
+                for f in files:
+                    fp = os.path.join(root, f)
+                    try:
+                        mt = os.path.getmtime(fp)
+                        if mt > latest_time:
+                            latest_time = mt
+                            latest_file = fp
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    if latest_file and latest_time > 0:
+        dt_str = datetime.fromtimestamp(latest_time).strftime("%Y-%m-%d %H:%M:%S")
+        return os.path.basename(latest_file), dt_str, latest_file
+    return "None", "N/A", "N/A"
+
+
 PROGRESS_FILE = os.path.join(os.path.dirname(__file__), "indexer_progress.json")
 
-def write_progress(is_running: bool, scanned: int, indexed: int, skipped: int, status_msg: str):
+def write_progress(is_running: bool, scanned: int, indexed: int, skipped: int, status_msg: str, san_summary: dict = None):
     try:
         data = {
             "is_running": is_running,
@@ -661,6 +843,13 @@ def write_progress(is_running: bool, scanned: int, indexed: int, skipped: int, s
             "status_message": status_msg,
             "timestamp": time.time()
         }
+        if san_summary is not None:
+            data["san_summary"] = san_summary
+        elif os.path.exists(PROGRESS_FILE):
+            with open(PROGRESS_FILE, "r", encoding="utf-8") as f:
+                old = json.load(f)
+                if "san_summary" in old:
+                    data["san_summary"] = old["san_summary"]
         with open(PROGRESS_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f)
     except Exception:
@@ -764,7 +953,6 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
     import subprocess
     if sys.platform == 'win32' and net_user and net_pass:
         try:
-            # Authenticate SMB share using net use if credentials provided
             share_root = network_target.split('\\')[0:4]
             share_path = "\\".join([p for p in share_root if p])
             if share_path.startswith('\\\\'):
@@ -774,21 +962,32 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
 
     sync_failed = False
     failure_reason = ""
+    san_summary = {}
 
     try:
         os.makedirs(network_target, exist_ok=True)
+
+        # 1. Documents SAN Sync
         if sys.platform == 'win32':
-            # Enforce /R:1 (max 1 retry attempt), multi-threading (/MT:16), exclude temp/cache dirs
             cmd = ["robocopy", backup_dir, network_target, "/MIR", "/FFT", "/R:1", "/W:2", "/MT:16", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
             code = run_robocopy_with_live_progress(cmd, label=f"Syncing backups to '{network_target}'")
             if code <= 7:
                 print(f"[✓] Network backup sync complete to '{network_target}'!")
+        
+        doc_fname, doc_ftime, doc_fpath = get_latest_file_info(backup_dir)
+        san_summary["Documents"] = {
+            "source": backup_dir,
+            "target": network_target,
+            "latest_file": doc_fname,
+            "latest_time": doc_ftime,
+            "latest_path": doc_fpath
+        }
             
-        # Direct NAS Sync for D:\Active research (ALL file types directly to NAS)
+        # 2. Direct NAS Sync for D:\Active research
         active_res_src = r"D:\Active research"
+        active_res_nas = os.path.join(network_target, "Active research")
         if os.path.exists(active_res_src):
             print(f"[*] Syncing ALL file types from '{active_res_src}' directly to NAS target...")
-            active_res_nas = os.path.join(network_target, "Active research")
             os.makedirs(active_res_nas, exist_ok=True)
             if sys.platform == 'win32':
                 cmd_ar = ["robocopy", active_res_src, active_res_nas, "/MIR", "/FFT", "/R:1", "/W:2", "/MT:16", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
@@ -797,6 +996,83 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
                     print(f"[✓] Direct Active research NAS sync complete to '{active_res_nas}'!")
                 else:
                     print(f"[-] Robocopy code {returncode_ar} during direct Active research NAS sync.")
+
+        ar_fname, ar_ftime, ar_fpath = get_latest_file_info(active_res_src)
+        san_summary["Active Research"] = {
+            "source": active_res_src,
+            "target": active_res_nas,
+            "latest_file": ar_fname,
+            "latest_time": ar_ftime,
+            "latest_path": ar_fpath
+        }
+
+        # 3. Direct SAN Sync for EndNote Library & Articles
+        endnote_src = r"C:\Users\Paul Dexter\OneDrive - Indiana University\FromBox\1 My box folder\EndNote"
+        endnote_fallback = r"D:\Backups\Documents\Endnote"
+        endnote_local_dst = r"D:\Endnote"
+        endnote_nas_dst = r"\\Synology_NAS\Videos and pics\Endnote"
+        src_e = endnote_src if os.path.exists(endnote_src) else (endnote_fallback if os.path.exists(endnote_fallback) else endnote_local_dst)
+        if os.path.exists(src_e) and sys.platform == 'win32':
+            print(f"[*] Syncing EndNote from '{src_e}' to SAN target '{endnote_nas_dst}'...")
+            if os.path.normpath(src_e) != os.path.normpath(endnote_local_dst):
+                cmd_e1 = ["robocopy", src_e, endnote_local_dst, "/E", "/FFT", "/R:1", "/W:2", "/MT:16", "/NFL", "/NDL"]
+                run_robocopy_with_live_progress(cmd_e1, label=f"Local EndNote sync to '{endnote_local_dst}'")
+            cmd_e2 = ["robocopy", endnote_local_dst, endnote_nas_dst, "/E", "/FFT", "/R:1", "/W:2", "/MT:16", "/NFL", "/NDL"]
+            returncode_e = run_robocopy_with_live_progress(cmd_e2, label=f"Syncing EndNote to '{endnote_nas_dst}'")
+            if returncode_e <= 7:
+                print(f"[✓] EndNote SAN sync complete to '{endnote_nas_dst}'!")
+            else:
+                print(f"[-] Robocopy code {returncode_e} during EndNote SAN sync.")
+
+        e_fname, e_ftime, e_fpath = get_latest_file_info(src_e)
+        san_summary["EndNote"] = {
+            "source": src_e,
+            "target": endnote_nas_dst,
+            "latest_file": e_fname,
+            "latest_time": e_ftime,
+            "latest_path": e_fpath
+        }
+
+        # 4. Direct SAN Sync for Quicken
+        quicken_src = r"C:\Users\Paul Dexter\OneDrive\Finances and family\Quicken"
+        quicken_local_dst = r"D:\Quicken"
+        quicken_nas_dst = r"\\Synology_NAS\Videos and pics\Quicken"
+        if os.path.exists(quicken_src) and sys.platform == 'win32':
+            print(f"[*] Syncing Quicken from '{quicken_src}' to SAN target '{quicken_nas_dst}'...")
+            cmd_q1 = ["robocopy", quicken_src, quicken_local_dst, "/E", "/FFT", "/R:1", "/W:2", "/MT:16", "/NFL", "/NDL"]
+            run_robocopy_with_live_progress(cmd_q1, label=f"Local Quicken sync to '{quicken_local_dst}'")
+            cmd_q2 = ["robocopy", quicken_local_dst, quicken_nas_dst, "/E", "/FFT", "/R:1", "/W:2", "/MT:16", "/NFL", "/NDL"]
+            returncode_q = run_robocopy_with_live_progress(cmd_q2, label=f"Syncing Quicken to '{quicken_nas_dst}'")
+            if returncode_q <= 7:
+                print(f"[✓] Quicken SAN sync complete to '{quicken_nas_dst}'!")
+            else:
+                print(f"[-] Robocopy code {returncode_q} during Quicken SAN sync.")
+
+        q_fname, q_ftime, q_fpath = get_latest_file_info(quicken_src)
+        san_summary["Quicken"] = {
+            "source": quicken_src,
+            "target": quicken_nas_dst,
+            "latest_file": q_fname,
+            "latest_time": q_ftime,
+            "latest_path": q_fpath
+        }
+
+        # Display Summary Table in Console
+        print("\n==========================================================================================")
+        print("                  SAN BACKUP RECENT FILE CHANGES SUMMARY REPORT                           ")
+        print("==========================================================================================")
+        for cat, info in san_summary.items():
+            print(f" • {cat.upper()}:")
+            print(f"     SAN Target Path:  {info['target']}")
+            print(f"     Last File Change: {info['latest_file']}")
+            print(f"     Modified Time:    {info['latest_time']}")
+            print(f"     Source Path:      {info['latest_path']}")
+            print("------------------------------------------------------------------------------------------")
+        print("==========================================================================================\n")
+
+        # Save summary to progress JSON for UI consumption
+        write_progress(False, 0, 0, 0, "✅ SAN Backup Complete!", san_summary=san_summary)
+
     except Exception as e:
         sync_failed = True
         failure_reason = str(e)
@@ -1017,17 +1293,40 @@ def main():
                 except Exception:
                     pass
 
-        # Ghost / Dead File Cleanup Pass
+        # Ghost / Dead File Cleanup Pass (Purges deleted files from OpenSearch index, thumbnail cache, and local backup)
         total_deleted = 0
-        if not args.force and existing_map:
-            dead_paths = set(existing_map.keys()) - scanned_paths
+        if existing_map:
+            dead_paths = [fp for fp in existing_map.keys() if not os.path.exists(fp)]
             if dead_paths:
-                print(f"[*] Cleaning up {len(dead_paths):,} deleted or moved documents from index...")
+                print(f"[*] Cleaning up {len(dead_paths):,} deleted or moved documents from index & backups...")
                 for fp in dead_paths:
                     try:
+                        # 1. Remove from OpenSearch Index
                         doc_id = hashlib.sha256(fp.encode('utf-8')).hexdigest()
                         client.delete(index=args.index, id=doc_id, ignore=[404])
                         total_deleted += 1
+
+                        # 2. Remove cached thumbnail
+                        file_hash = get_thumbnail_hash(fp)
+                        cache_path = os.path.join(THUMB_CACHE_DIR, f"{file_hash}.jpg")
+                        if os.path.exists(cache_path):
+                            try:
+                                os.remove(cache_path)
+                            except Exception:
+                                pass
+
+                        # 3. Remove local backup copy so robocopy /MIR syncs deletion to NAS
+                        if backup_dir:
+                            norm_p = os.path.normpath(os.path.abspath(fp))
+                            drive, rest = os.path.splitdrive(norm_p)
+                            rel_path = rest.lstrip('\\').lstrip('/')
+                            local_b_path = os.path.join(backup_dir, rel_path)
+                            if os.path.exists(local_b_path):
+                                try:
+                                    os.remove(local_b_path)
+                                    print(f"[✓] Purged deleted file from local backup: {local_b_path}")
+                                except Exception:
+                                    pass
                     except Exception:
                         pass
                 client.indices.refresh(index=args.index)

@@ -25,7 +25,8 @@ QUICKEN_LOCAL_DST = r"D:\Quicken"
 QUICKEN_NAS_DST = r"\\Synology_NAS\Videos and pics\Quicken"
 
 # EndNote Backup Paths
-ENDNOTE_SRC = r"C:\Users\Paul Dexter\OneDrive\Endnote"
+ENDNOTE_SRC = r"C:\Users\Paul Dexter\OneDrive - Indiana University\FromBox\1 My box folder\EndNote"
+ENDNOTE_FALLBACK_SRC = r"D:\Backups\Documents\Endnote"
 ENDNOTE_LOCAL_DST = r"D:\Endnote"
 ENDNOTE_NAS_DST = r"\\Synology_NAS\Videos and pics\Endnote"
 
@@ -47,7 +48,7 @@ def log(msg):
         except Exception:
             pass
     try:
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
+        with open(LOG_FILE, "a", encoding="utf-8", errors="replace") as f:
             f.write(line + "\n")
     except Exception:
         pass
@@ -71,12 +72,17 @@ def run_quicken_sync():
 
 
 def run_endnote_sync():
-    log(f"[*] Syncing EndNote: '{ENDNOTE_SRC}' -> '{ENDNOTE_LOCAL_DST}'...")
-    try:
-        cmd1 = ["robocopy", ENDNOTE_SRC, ENDNOTE_LOCAL_DST, "/E", "/FFT", "/R:1", "/W:1", "/MT:16", "/NFL", "/NDL"]
-        subprocess.run(cmd1, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception as e:
-        log(f"[-] EndNote Local Sync error: {e}")
+    src = ENDNOTE_SRC if os.path.exists(ENDNOTE_SRC) else (ENDNOTE_FALLBACK_SRC if os.path.exists(ENDNOTE_FALLBACK_SRC) else ENDNOTE_LOCAL_DST)
+    if not os.path.exists(src):
+        log(f"[-] EndNote source path not found. Skipping sync.")
+        return
+    if os.path.normpath(src) != os.path.normpath(ENDNOTE_LOCAL_DST):
+        log(f"[*] Syncing EndNote: '{src}' -> '{ENDNOTE_LOCAL_DST}'...")
+        try:
+            cmd1 = ["robocopy", src, ENDNOTE_LOCAL_DST, "/E", "/FFT", "/R:1", "/W:1", "/MT:16", "/NFL", "/NDL"]
+            subprocess.run(cmd1, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as e:
+            log(f"[-] EndNote Local Sync error: {e}")
 
     log(f"[*] Syncing EndNote: '{ENDNOTE_LOCAL_DST}' -> '{ENDNOTE_NAS_DST}'...")
     try:

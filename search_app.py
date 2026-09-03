@@ -13,10 +13,10 @@ Includes:
 import os
 import io
 import re
+import html
 import json
 import string
 import sys
-import html
 import time
 import urllib.parse
 import threading
@@ -24,9 +24,11 @@ from concurrent.futures import ThreadPoolExecutor
 import subprocess
 import hashlib
 import zipfile
+import tempfile
+import ctypes
 import math
 import xml.etree.ElementTree as ET
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import HTTPServer, ThreadingHTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 from datetime import datetime
 from pathlib import Path
@@ -37,6 +39,38 @@ try:
     fitz.TOOLS.mupdf_display_errors(False)
 except Exception:
     pass
+
+
+def safe_read_bytes(file_path):
+    """
+    Safely reads bytes from a file even if locked exclusively by Word/Excel/PowerPoint/OneDrive.
+    """
+    if not os.path.exists(file_path):
+        return None
+    try:
+        with open(file_path, 'rb') as f:
+            return f.read()
+    except PermissionError:
+        tmp_dir = tempfile.gettempdir()
+        tmp_name = f"opensearch_lock_{os.getpid()}_{os.path.basename(file_path)}"
+        tmp_path = os.path.join(tmp_dir, tmp_name)
+        try:
+            res = ctypes.windll.kernel32.CopyFileW(file_path, tmp_path, False)
+            if res != 0:
+                with open(tmp_path, 'rb') as f:
+                    data = f.read()
+                return data
+        except Exception:
+            pass
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return None
 
 
 def format_doc_date(date_str):
@@ -115,11 +149,20 @@ def get_thumbnail_hash(file_path):
 
 
 def generate_fast_docx_cover(file_path, cache_path):
-    if mammoth is not None and Html2Image is not None:
+    file_bytes = safe_read_bytes(file_path)
+    if file_bytes and mammoth is not None and Html2Image is not None:
         try:
-            with open(file_path, 'rb') as docx_file:
-                res = mammoth.convert_to_html(docx_file)
-                html_body = res.value[:50000] if res.value else ""
+            res = mammoth.convert_to_html(io.BytesIO(file_bytes))
+            raw_html = res.value or ""
+
+            # Safely slice at valid tag boundary so base64 <img src="data:image..."> tags are never chopped in half
+            if len(raw_html) > 600000:
+                cut_pos = raw_html.rfind('</p>', 0, 600000)
+                if cut_pos == -1:
+                    cut_pos = raw_html.rfind('>', 0, 600000)
+                html_body = raw_html[:cut_pos+4] if cut_pos != -1 else raw_html[:600000]
+            else:
+                html_body = raw_html
 
             if html_body and len(html_body.strip()) > 0:
                 html_content = f"""<!DOCTYPE html>
@@ -135,6 +178,7 @@ tr:nth-child(even) {{ background-color: #f8f9fa; }}
 tr:first-child {{ background-color: #e9ecef; font-weight: bold; }}
 h1, h2, h3, h4, h5, h6 {{ margin-top: 0; color: #111; }}
 p {{ margin-bottom: 1rem; }}
+img {{ max-width: 100%; height: auto; display: block; margin: 12px 0; border-radius: 4px; }}
 </style>
 </head>
 <body>
@@ -158,16 +202,17 @@ p {{ margin-bottom: 1rem; }}
 
     file_name = os.path.basename(file_path)
     snippet = ""
-    try:
-        with zipfile.ZipFile(file_path) as z:
-            if 'word/document.xml' in z.namelist():
-                xml_content = z.read('word/document.xml')
-                tree = ET.fromstring(xml_content)
-                text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
-                full_text = " ".join([node.text for node in text_nodes if node.text])
-                snippet = full_text[:400]
-    except Exception:
-        pass
+    if file_bytes:
+        try:
+            with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+                if 'word/document.xml' in z.namelist():
+                    xml_content = z.read('word/document.xml')
+                    tree = ET.fromstring(xml_content)
+                    text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
+                    full_text = " ".join([node.text for node in text_nodes if node.text])
+                    snippet = full_text[:400]
+        except Exception:
+            pass
 
     img = Image.new('RGB', (600, 720), color='#ffffff')
     draw = ImageDraw.Draw(img)
@@ -552,8 +597,17 @@ def get_thumbnail_bytes(file_path):
 
     if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
         try:
-            with open(cache_path, 'rb') as f:
-                return f.read(), "image/jpeg"
+            if os.path.getmtime(cache_path) >= os.path.getmtime(file_path):
+                ext_clean = ext.lower()
+                if ext_clean in ('docx', 'doc'):
+                    try:
+                        with Image.open(cache_path) as img:
+                            if img.size == (600, 720) and mammoth is not None and Html2Image is not None:
+                                generate_fast_docx_cover(file_path, cache_path)
+                    except Exception:
+                        pass
+                with open(cache_path, 'rb') as f:
+                    return f.read(), "image/jpeg"
         except Exception:
             pass
 
@@ -622,19 +676,32 @@ def get_thumbnail_bytes(file_path):
     return None, None
 
 
+_LAST_KNOWN_DOC_COUNT = 0
+
 def get_client():
-    return OpenSearch(hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}], use_ssl=False)
+    return OpenSearch(
+        hosts=[{"host": OPENSEARCH_HOST, "port": OPENSEARCH_PORT}],
+        use_ssl=False,
+        timeout=15,
+        max_retries=3,
+        retry_on_timeout=True
+    )
 
 
 def get_document_count():
-    try:
-        client = get_client()
-        if client.indices.exists(index="documents"):
-            res = client.count(index="documents")
-            return res.get('count', 0)
-    except Exception:
-        pass
-    return 0
+    global _LAST_KNOWN_DOC_COUNT
+    for attempt in range(3):
+        try:
+            client = get_client()
+            if client.indices.exists(index="documents"):
+                res = client.count(index="documents")
+                cnt = res.get('count', 0)
+                if cnt > 0:
+                    _LAST_KNOWN_DOC_COUNT = cnt
+                    return cnt
+        except Exception:
+            time.sleep(0.5)
+    return _LAST_KNOWN_DOC_COUNT
 
 
 def load_config():
@@ -717,11 +784,13 @@ def parse_smart_query(user_query: str, sort_by: str = "relevance", page: int = 1
             must_not_terms.append(token[1:].strip('()'))
             continue
 
-        clean_token = token.lower().lstrip('.')
+        clean_token = token.lower().strip('.,;:\"\'()[]{}')
         if clean_token in KNOWN_EXTENSIONS:
             file_types.append(clean_token)
         else:
-            must_terms.append(token)
+            clean_must = token.strip('.,;:\"\'()[]{}')
+            if clean_must:
+                must_terms.append(clean_must)
 
     must_conditions = []
     must_not_conditions = []
@@ -924,6 +993,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             <div class="index-badge" id="indexStatusBadge">⏳ Indexing active in background...</div>
         </div>
 
+        <div id="sanSummaryContainer" style="display:none; margin: 15px 0;"></div>
+
         {PAGINATION_TOP}
 
         {RESULTS}
@@ -1045,27 +1116,51 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         }
 
         async function handleOpenFile(filePath, customUrl) {
-            showToast('Opening file in default application...');
-            window.location.href = customUrl;
             try {
-                await fetch('/api/open_file?path=' + encodeURIComponent(filePath));
-            } catch (e) {}
+                const res = await fetch('/api/open_file?path=' + encodeURIComponent(filePath));
+                const data = await res.json();
+                if (data.status === 'error') {
+                    showToast('❌ ' + data.message, true);
+                } else if (data.status === 'warning') {
+                    showToast('⚠️ ' + data.message, true);
+                } else {
+                    showToast('Opening file in default application...');
+                }
+            } catch (e) {
+                window.location.href = customUrl;
+            }
         }
 
         async function handleOpenExplorer(filePath, customUrl) {
-            showToast('Opening folder in Windows File Explorer...');
-            window.location.href = customUrl;
             try {
-                await fetch('/api/open_folder?explorer=1&path=' + encodeURIComponent(filePath));
-            } catch (e) {}
+                const res = await fetch('/api/open_folder?explorer=1&path=' + encodeURIComponent(filePath));
+                const data = await res.json();
+                if (data.status === 'error') {
+                    showToast('❌ ' + data.message, true);
+                } else if (data.status === 'warning') {
+                    showToast('⚠️ ' + data.message, true);
+                } else {
+                    showToast('Opening folder in Windows File Explorer...');
+                }
+            } catch (e) {
+                window.location.href = customUrl;
+            }
         }
 
         async function handleOpenFolder(filePath, customUrl) {
-            showToast('Opening folder in Directory Opus...');
-            window.location.href = customUrl;
             try {
-                await fetch('/api/open_folder?path=' + encodeURIComponent(filePath));
-            } catch (e) {}
+                const res = await fetch('/api/open_folder?path=' + encodeURIComponent(filePath));
+                const data = await res.json();
+                if (data.status === 'error') {
+                    showToast('❌ ' + data.message, true);
+                } else if (data.status === 'warning') {
+                    showToast('⚠️ ' + data.message, true);
+                } else {
+                    showToast('Opening folder in Directory Opus...');
+                }
+            } catch (e) {
+                window.location.href = customUrl;
+            }
         }
 
         async function checkStatus() {
@@ -1097,6 +1192,23 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                         btn.innerText = '⚡ Start Indexing';
                         badge.style.display = 'none';
                     }
+                }
+
+                const sanContainer = document.getElementById('sanSummaryContainer');
+                if (data.san_summary && sanContainer) {
+                    let html = '<div class="san-summary-box">';
+                    html += '<div class="san-summary-header">💾 SAN Backup Recent File Changes Summary</div>';
+                    html += '<div class="san-grid">';
+                    for (const [cat, info] of Object.entries(data.san_summary)) {
+                        html += '<div class="san-card">';
+                        html += '<div class="san-card-title">📂 ' + cat + '</div>';
+                        html += '<div class="san-card-file" title="' + (info.latest_path || '') + '">📄 ' + (info.latest_file || 'None') + '</div>';
+                        html += '<div class="san-card-time">🕒 Modified: ' + (info.latest_time || 'N/A') + '</div>';
+                        html += '</div>';
+                    }
+                    html += '</div></div>';
+                    sanContainer.innerHTML = html;
+                    sanContainer.style.display = 'block';
                 }
             } catch (e) {}
         }
@@ -1365,22 +1477,13 @@ def check_indexer_process_running():
     global INDEXER_PROCESS
     if INDEXER_PROCESS is not None and INDEXER_PROCESS.poll() is None:
         return True
-    try:
-        import psutil
-        for p in psutil.process_iter(['name', 'cmdline']):
-            if p.info['name'] and 'python' in p.info['name'].lower():
-                cmd = p.info['cmdline']
-                if cmd and any('ingest_documents.py' in arg for arg in cmd):
-                    return True
-    except Exception:
-        pass
 
     prog_file = os.path.join(os.path.dirname(__file__), "indexer_progress.json")
     if os.path.exists(prog_file):
         try:
             with open(prog_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            if data.get("is_running") and (time.time() - data.get("timestamp", 0)) < 120:
+            if data.get("is_running") and (time.time() - data.get("timestamp", 0)) < 30:
                 return True
         except Exception:
             pass
@@ -1389,10 +1492,13 @@ def check_indexer_process_running():
 
 class SearchHandler(SimpleHTTPRequestHandler):
     def send_json(self, data, status=200):
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode('utf-8'))
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode('utf-8'))
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            pass
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -1447,7 +1553,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
                     try:
                         self.send_response(200)
                         self.send_header("Content-Type", content_type)
-                        self.send_header("Cache-Control", "public, max-age=86400")
+                        self.send_header("Cache-Control", "no-cache, must-revalidate")
                         self.end_headers()
                         self.wfile.write(img_data)
                     except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
@@ -1460,15 +1566,23 @@ class SearchHandler(SimpleHTTPRequestHandler):
         # API: Open File in Windows Default App
         if parsed.path == '/api/open_file':
             file_path = params.get('path', [''])[0]
-            if file_path and os.path.exists(file_path):
-                try:
-                    norm_path = os.path.normpath(file_path)
-                    os.startfile(norm_path)
-                    self.send_json({"status": "ok", "message": "File opened successfully"})
-                except Exception as e:
-                    self.send_json({"status": "error", "message": str(e)}, status=500)
+            if file_path:
+                norm_path = os.path.normpath(file_path)
+                if os.path.exists(norm_path):
+                    try:
+                        os.startfile(norm_path)
+                        self.send_json({"status": "ok", "message": "File opened successfully"})
+                    except Exception as e:
+                        self.send_json({"status": "error", "message": str(e)}, status=500)
+                else:
+                    parent_dir = os.path.dirname(norm_path)
+                    if os.path.exists(parent_dir):
+                        subprocess.Popen(['explorer', parent_dir])
+                        self.send_json({"status": "warning", "message": f"File no longer exists. Opened parent folder: {parent_dir}"})
+                    else:
+                        self.send_json({"status": "error", "message": f"File and parent folder not found on disk"}, status=404)
             else:
-                self.send_json({"status": "error", "message": f"File not found: {file_path}"}, status=404)
+                self.send_json({"status": "error", "message": "No file path provided"}, status=400)
             return
 
         # API: Open Containing Folder directly in Windows File Explorer or Directory Opus
@@ -1476,26 +1590,54 @@ class SearchHandler(SimpleHTTPRequestHandler):
             file_path = params.get('path', [''])[0]
             force_explorer = params.get('explorer', ['0'])[0] == '1'
 
-            if file_path and os.path.exists(file_path):
+            if file_path:
+                norm_path = os.path.normpath(file_path)
+                target_path = norm_path
+                file_missing = False
+
+                if not os.path.exists(norm_path):
+                    parent_dir = os.path.dirname(norm_path)
+                    if os.path.exists(parent_dir):
+                        target_path = parent_dir
+                        file_missing = True
+                    else:
+                        self.send_json({"status": "error", "message": f"Path and parent directory not found on disk"}, status=404)
+                        return
+
                 try:
-                    norm_path = os.path.normpath(file_path)
-                    
                     if force_explorer:
-                        subprocess.Popen(['explorer', '/select,', norm_path])
-                        self.send_json({"status": "ok", "message": "Folder opened in Windows Explorer"})
+                        if file_missing:
+                            subprocess.Popen(['explorer', target_path])
+                        else:
+                            subprocess.Popen(['explorer', '/select,', target_path])
+                        msg = f"File moved/deleted. Opened parent folder: {target_path}" if file_missing else "Folder opened in Windows Explorer"
+                        self.send_json({"status": "warning" if file_missing else "ok", "message": msg})
                     else:
                         if os.path.exists(DOPUS_RT):
-                            subprocess.Popen([DOPUS_RT, "/cmd", "Go", norm_path, "NEW", "SELECT"])
+                            if file_missing or os.path.isdir(target_path):
+                                subprocess.Popen([DOPUS_RT, "/cmd", "Go", target_path, "NEW"])
+                            else:
+                                parent_dir = os.path.dirname(target_path)
+                                file_name = os.path.basename(target_path)
+                                subprocess.Popen([DOPUS_RT, "/cmd", "Go", parent_dir, "NEW", f"SELECT={file_name}"])
                         elif os.path.exists(DOPUS_EXE):
-                            subprocess.Popen([DOPUS_EXE, "/select", norm_path])
+                            if file_missing or os.path.isdir(target_path):
+                                subprocess.Popen([DOPUS_EXE, target_path])
+                            else:
+                                parent_dir = os.path.dirname(target_path)
+                                subprocess.Popen([DOPUS_EXE, parent_dir])
                         else:
-                            subprocess.Popen(['explorer', '/select,', norm_path])
+                            if file_missing or os.path.isdir(target_path):
+                                subprocess.Popen(['explorer', target_path])
+                            else:
+                                subprocess.Popen(['explorer', '/select,', target_path])
                             
-                        self.send_json({"status": "ok", "message": "Folder opened in Directory Opus"})
+                        msg = f"File moved/deleted. Opened parent folder: {target_path}" if file_missing else "Folder opened in Directory Opus"
+                        self.send_json({"status": "warning" if file_missing else "ok", "message": msg})
                 except Exception as e:
                     self.send_json({"status": "error", "message": str(e)}, status=500)
             else:
-                self.send_json({"status": "error", "message": f"Path not found: {file_path}"}, status=404)
+                self.send_json({"status": "error", "message": "No file path provided"}, status=400)
             return
 
         # API: Indexing Status & Total Count
@@ -1524,7 +1666,8 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 "scanned": progress.get("scanned", 0),
                 "indexed": progress.get("indexed", 0),
                 "skipped": progress.get("skipped", 0),
-                "status_message": msg
+                "status_message": msg,
+                "san_summary": progress.get("san_summary", None)
             })
             return
 
@@ -1574,11 +1717,19 @@ class SearchHandler(SimpleHTTPRequestHandler):
         }
 
         if query_str:
-            try:
-                client = get_client()
-                es_query = parse_smart_query(query_str, sort_by=sort_by, page=page, page_size=PAGE_SIZE)
-                res = client.search(index="documents", body=es_query)
+            client = get_client()
+            es_query = parse_smart_query(query_str, sort_by=sort_by, page=page, page_size=PAGE_SIZE)
+            res = None
+            last_err = None
+            for attempt in range(3):
+                try:
+                    res = client.search(index="documents", body=es_query)
+                    break
+                except Exception as e:
+                    last_err = e
+                    time.sleep(0.6 * (attempt + 1))
 
+            if res is not None:
                 hits = res['hits']['hits']
                 total = res['hits']['total']['value']
                 took = res['took']
@@ -1626,13 +1777,18 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         open_file_url = f"openfile://{encoded_path}"
                         open_opus_url = f"openopus://{encoded_path}"
                         open_explorer_url = f"openexplorer://{encoded_path}"
-                        thumb_url = f"/api/thumbnail?path={encoded_path}&v=2"
-                        
                         escaped_display_path = html.escape(fpath)
                         ftype = src.get('file_type', 'doc').lower()
 
                         mod_val = src.get('modified_date', '')
                         create_val = src.get('created_date', '')
+
+                        if mod_val:
+                            mtime_ver = hashlib.md5(str(mod_val).encode('utf-8')).hexdigest()[:8]
+                        else:
+                            mtime_ver = 2
+
+                        thumb_url = f"/api/thumbnail?path={encoded_path}&v={mtime_ver}"
 
                         mod_str = format_doc_date(mod_val)
                         create_str = format_doc_date(create_val)
@@ -1680,8 +1836,17 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         """
                         cards.append(card)
                     results_html = "\n".join(cards)
-            except Exception as e:
-                results_html = f"<div class='result-card' style='color:red;'>Error executing search: {e}</div>"
+            else:
+                err_msg = str(last_err)
+                if "503" in err_msg or "search_phase_execution_exception" in err_msg:
+                    results_html = """<div class='result-card' style='border-left: 5px solid #ff9800; background-color: #fff3e0; padding: 20px; text-align: center; border-radius: 8px; margin-top: 15px;'>
+                        <h3 style='color: #e65100; margin-top: 0; margin-bottom: 8px;'>⚠️ OpenSearch Engine Warming Up / Initializing Shards</h3>
+                        <p style='color: #bf360c; font-size: 14px; margin-bottom: 12px;'>The search cluster is currently initializing shards or completing background index flushes (503 Service Unavailable).</p>
+                        <p style='color: #666; font-size: 13px; margin-bottom: 15px;'>Please wait 5–10 seconds and click the button below to retry your search.</p>
+                        <button onclick='window.location.reload()' style='background: #e65100; color: white; border: none; padding: 10px 22px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px;'>🔄 Retry Search</button>
+                    </div>"""
+                else:
+                    results_html = f"<div class='result-card' style='color:red;'>Error executing search: {html.escape(err_msg)}</div>"
 
         html_out = HTML_TEMPLATE.replace("{QUERY}", query_str).replace("{STATS}", stats_html).replace("{RESULTS}", results_html).replace("{SELECTED_JSON}", selected_json)
         html_out = html_out.replace("{PAGINATION_TOP}", pagination_html).replace("{PAGINATION_BOTTOM}", pagination_html)
@@ -1762,7 +1927,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
 
 
 def main():
-    server = HTTPServer(('localhost', 8080), SearchHandler)
+    server = ThreadingHTTPServer(('localhost', 8080), SearchHandler)
     print("[+] OpenSearch Smart Search Server running at http://localhost:8080")
     server.serve_forever()
 

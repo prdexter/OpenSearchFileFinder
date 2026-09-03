@@ -13,7 +13,5 @@
     "D:\\Disparities project",
     "D:\\Dropbox"
   ],
-  "network_backup_target": "\\\\Synology_NAS\\Videos and pics\\Backup",
-  "quicken_backup_target": "\\\\Synology_NAS\\Videos and pics\\Quicken",
-  "endnote_backup_target": "\\\\Synology_NAS\\Videos and pics\\Endnote"
+  "network_backup_target": "\\\\Synology_NAS\\Videos and pics\\Backup"
 }

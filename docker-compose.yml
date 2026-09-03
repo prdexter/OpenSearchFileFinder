@@ -19,8 +19,8 @@ services:
         soft: 65536
         hard: 65536
     ports:
-      - "9200:9200"
-      - "9600:9600"
+      - "127.0.0.1:9200:9200"
+      - "127.0.0.1:9600:9600"
     volumes:
       - opensearch-data:/usr/share/opensearch/data
     networks:
@@ -30,7 +30,7 @@ services:
     image: opensearchproject/opensearch-dashboards:2.18.0
     container_name: opensearch-dashboards
     ports:
-      - "5601:5601"
+      - "127.0.0.1:5601:5601"
     environment:
       - OPENSEARCH_HOSTS=["http://opensearch-node:9200"]
       - DISABLE_SECURITY_PLUGIN=true

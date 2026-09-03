@@ -10,6 +10,8 @@ import sys
 import time
 import hashlib
 import zipfile
+import tempfile
+import ctypes
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from opensearchpy import OpenSearch
@@ -41,17 +43,58 @@ if not os.path.exists(THUMB_CACHE_DIR):
     os.makedirs(THUMB_CACHE_DIR, exist_ok=True)
 
 
+def safe_read_bytes(file_path):
+    """
+    Safely reads bytes from a file even if locked exclusively by Word/Excel/PowerPoint/OneDrive.
+    """
+    if not os.path.exists(file_path):
+        return None
+    try:
+        with open(file_path, 'rb') as f:
+            return f.read()
+    except PermissionError:
+        tmp_dir = tempfile.gettempdir()
+        tmp_name = f"opensearch_lock_{os.getpid()}_{os.path.basename(file_path)}"
+        tmp_path = os.path.join(tmp_dir, tmp_name)
+        try:
+            res = ctypes.windll.kernel32.CopyFileW(file_path, tmp_path, False)
+            if res != 0:
+                with open(tmp_path, 'rb') as f:
+                    data = f.read()
+                return data
+        except Exception:
+            pass
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return None
+
+
 def get_thumbnail_hash(file_path):
     norm = os.path.normpath(os.path.abspath(file_path)).lower()
     return hashlib.md5(norm.encode('utf-8')).hexdigest()
 
 
 def generate_fast_docx_cover(file_path, cache_path):
-    if mammoth is not None and Html2Image is not None:
+    file_bytes = safe_read_bytes(file_path)
+    if file_bytes and mammoth is not None and Html2Image is not None:
         try:
-            with open(file_path, 'rb') as docx_file:
-                res = mammoth.convert_to_html(docx_file)
-                html_body = res.value[:50000] if res.value else ""
+            res = mammoth.convert_to_html(io.BytesIO(file_bytes))
+            raw_html = res.value or ""
+
+            # Safely slice at valid tag boundary so base64 <img src="data:image..."> tags are never chopped in half
+            if len(raw_html) > 600000:
+                cut_pos = raw_html.rfind('</p>', 0, 600000)
+                if cut_pos == -1:
+                    cut_pos = raw_html.rfind('>', 0, 600000)
+                html_body = raw_html[:cut_pos+4] if cut_pos != -1 else raw_html[:600000]
+            else:
+                html_body = raw_html
 
             if html_body and len(html_body.strip()) > 0:
                 html_content = f"""<!DOCTYPE html>
@@ -67,6 +110,7 @@ tr:nth-child(even) {{ background-color: #f8f9fa; }}
 tr:first-child {{ background-color: #e9ecef; font-weight: bold; }}
 h1, h2, h3, h4, h5, h6 {{ margin-top: 0; color: #111; }}
 p {{ margin-bottom: 1rem; }}
+img {{ max-width: 100%; height: auto; display: block; margin: 12px 0; border-radius: 4px; }}
 </style>
 </head>
 <body>
@@ -90,16 +134,17 @@ p {{ margin-bottom: 1rem; }}
 
     file_name = os.path.basename(file_path)
     snippet = ""
-    try:
-        with zipfile.ZipFile(file_path) as z:
-            if 'word/document.xml' in z.namelist():
-                xml_content = z.read('word/document.xml')
-                tree = ET.fromstring(xml_content)
-                text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
-                full_text = " ".join([node.text for node in text_nodes if node.text])
-                snippet = full_text[:400]
-    except Exception:
-        pass
+    if file_bytes:
+        try:
+            with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
+                if 'word/document.xml' in z.namelist():
+                    xml_content = z.read('word/document.xml')
+                    tree = ET.fromstring(xml_content)
+                    text_nodes = tree.findall('.//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
+                    full_text = " ".join([node.text for node in text_nodes if node.text])
+                    snippet = full_text[:400]
+        except Exception:
+            pass
 
     img = Image.new('RGB', (600, 720), color='#ffffff')
     draw = ImageDraw.Draw(img)
@@ -406,8 +451,12 @@ def process_single_thumbnail(src):
     file_hash = get_thumbnail_hash(file_path)
     cache_path = os.path.join(THUMB_CACHE_DIR, f"{file_hash}.jpg")
 
-    if os.path.exists(cache_path):
-        return 'skipped'
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+        try:
+            if os.path.getmtime(cache_path) >= os.path.getmtime(file_path):
+                return 'skipped'
+        except Exception:
+            pass
 
     try:
         if ftype == 'pdf':

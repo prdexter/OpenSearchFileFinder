@@ -27,22 +27,47 @@ def main():
     elif len(file_path) >= 2 and file_path[1] == '/':
         file_path = file_path[0] + ':' + file_path[2:]
 
-    if not os.path.exists(file_path):
-        return
+    file_exists = os.path.exists(file_path)
+    target_path = file_path
+
+    if not file_exists:
+        parent_dir = os.path.dirname(file_path)
+        if os.path.exists(parent_dir):
+            target_path = parent_dir
+        else:
+            return
 
     if protocol == "openfile":
-        os.startfile(file_path)
+        if file_exists:
+            os.startfile(target_path)
+        else:
+            subprocess.Popen(['explorer', target_path])
 
     elif protocol == "openexplorer":
-        subprocess.Popen(['explorer', '/select,', file_path])
+        if file_exists:
+            subprocess.Popen(['explorer', '/select,', target_path])
+        else:
+            subprocess.Popen(['explorer', target_path])
 
     elif protocol == "openopus":
         if os.path.exists(DOPUS_RT):
-            subprocess.Popen([DOPUS_RT, "/cmd", "Go", file_path, "NEW", "SELECT"])
+            if file_exists and not os.path.isdir(target_path):
+                parent_dir = os.path.dirname(target_path)
+                file_name = os.path.basename(target_path)
+                subprocess.Popen([DOPUS_RT, "/cmd", "Go", parent_dir, "NEW", f"SELECT={file_name}"])
+            else:
+                subprocess.Popen([DOPUS_RT, "/cmd", "Go", target_path, "NEW"])
         elif os.path.exists(DOPUS_EXE):
-            subprocess.Popen([DOPUS_EXE, "/select", file_path])
+            if file_exists and not os.path.isdir(target_path):
+                parent_dir = os.path.dirname(target_path)
+                subprocess.Popen([DOPUS_EXE, parent_dir])
+            else:
+                subprocess.Popen([DOPUS_EXE, target_path])
         else:
-            subprocess.Popen(['explorer', '/select,', file_path])
+            if file_exists and not os.path.isdir(target_path):
+                subprocess.Popen(['explorer', '/select,', target_path])
+            else:
+                subprocess.Popen(['explorer', target_path])
 
 if __name__ == "__main__":
     main()
