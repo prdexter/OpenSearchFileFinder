@@ -107,14 +107,25 @@ if not os.path.exists(THUMB_CACHE_DIR):
     os.makedirs(THUMB_CACHE_DIR, exist_ok=True)
 
 
+def to_long_path(path: str) -> str:
+    """Converts Windows path to extended-length path (\\\\?\\ prefix) if length >= 240 characters to bypass 260-char MAX_PATH limit."""
+    if sys.platform == 'win32' and isinstance(path, str) and not path.startswith('\\\\?\\'):
+        abs_p = os.path.abspath(path)
+        if len(abs_p) >= 240 and not abs_p.startswith('\\\\'):
+            return '\\\\?\\' + abs_p
+    return path
+
+
 def safe_read_bytes(file_path):
     """
     Safely reads bytes from a file even if locked exclusively by Word/Excel/PowerPoint/OneDrive.
+    Handles long Windows file paths (>= 260 chars) using extended path prefix.
     """
-    if not os.path.exists(file_path):
+    long_p = to_long_path(file_path)
+    if not os.path.exists(long_p):
         return None
     try:
-        with open(file_path, 'rb') as f:
+        with open(long_p, 'rb') as f:
             return f.read()
     except PermissionError:
         tmp_dir = tempfile.gettempdir()
@@ -725,7 +736,8 @@ def record_sync_event(action_label: str, src_path: str, dest_path: str, reason: 
 def copy_file_to_backup(file_path: str, backup_dir: str) -> str:
     """
     Mirrors file_path into backup_dir preserving directory structure.
-    Logs sync reason (NEW_FILE, SIZE_MISMATCH, TIMESTAMP_DRIFT) to sync_audit_report.txt in real time.
+    Uses extended Windows long-path syntax (\\\\?\\) for paths >= 260 chars.
+    Logs sync reason (NEW_FILE, SIZE_MISMATCH, TIMESTAMP_DRIFT) to sync_audit_report.txt ONLY after copy succeeds.
     """
     if not backup_dir:
         return None
@@ -739,13 +751,21 @@ def copy_file_to_backup(file_path: str, backup_dir: str) -> str:
         clean_rel = rel_path.lstrip('\\').lstrip('/')
         dest_path = os.path.join(backup_dir, clean_rel)
 
-        s_stat = os.stat(file_path)
+        long_src = to_long_path(file_path)
+        long_dest = to_long_path(dest_path)
+
+        s_stat = os.stat(long_src)
         src_size = s_stat.st_size
         src_mtime = s_stat.st_mtime
 
-        if os.path.exists(dest_path):
+        dest_exists = os.path.exists(long_dest)
+        dest_size = None
+        dest_mtime = None
+        reason = None
+
+        if dest_exists:
             try:
-                d_stat = os.stat(dest_path)
+                d_stat = os.stat(long_dest)
                 dest_size = d_stat.st_size
                 dest_mtime = d_stat.st_mtime
                 delta = abs(dest_mtime - src_mtime)
@@ -756,19 +776,23 @@ def copy_file_to_backup(file_path: str, backup_dir: str) -> str:
                     reason = f"SIZE_MISMATCH (Source: {src_size:,} bytes | Target: {dest_size:,} bytes)"
                 else:
                     reason = f"TIMESTAMP_DRIFT (Delta: {delta:.2f}s > 3.0s threshold)"
-
-                record_sync_event("Local D:\\ Backup", file_path, dest_path, reason, src_size, dest_size, src_mtime, dest_mtime)
             except Exception:
-                pass
+                reason = "DEST_STAT_FAILED"
         else:
             reason = "NEW_FILE (Target file missing on local backup)"
-            record_sync_event("Local D:\\ Backup", file_path, dest_path, reason, src_size, None, src_mtime, None)
 
-        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        # Ensure directory exists with long path support
+        os.makedirs(os.path.dirname(long_dest), exist_ok=True)
         import shutil
-        shutil.copy2(file_path, dest_path)
+        shutil.copy2(long_src, long_dest)
+
+        # Log ONLY when copy actually succeeds!
+        if reason:
+            record_sync_event("Local D:\\ Backup", file_path, dest_path, reason, src_size, dest_size, src_mtime, dest_mtime)
+
         return dest_path
-    except Exception:
+    except Exception as e:
+        print(f"[-] Backup copy error for '{file_path}': {e}")
         return None
 
 
@@ -780,7 +804,8 @@ def process_single_file(file_path: str, index_name: str, existing_map: dict = No
         return None, 'ignored'
         
     try:
-        stat = os.stat(file_path)
+        long_p = to_long_path(file_path)
+        stat = os.stat(long_p)
         norm_path = os.path.normpath(os.path.abspath(file_path)).lower()
         mtime_iso = datetime.fromtimestamp(stat.st_mtime).isoformat()
         file_size = stat.st_size
