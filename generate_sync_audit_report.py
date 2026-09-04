@@ -156,7 +156,7 @@ def generate_full_audit_report():
         "========================================================================================\n\n"
     )
 
-    with open(REPORT_FILE, "w", encoding="utf-8") as f:
+    with open(REPORT_FILE, "a", encoding="utf-8") as f:
         f.write(header)
         if not all_events:
             f.write("✅ NO FILES REQUIRE SYNC (All local backup files and Synology NAS copies are 100% up to date and in parity).\n")
