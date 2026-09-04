@@ -745,11 +745,20 @@ def process_single_file(file_path: str, index_name: str, existing_map: dict = No
             backup_dest = copy_file_to_backup(file_path, backup_dir)
             is_backed_up = backup_dest is not None
 
-        # Fast Delta Skip Check: Compare file mtime and file size for OpenSearch indexing
+        # Fast Delta Skip Check: Compare file mtime and file size with 3-second tolerance
         if not force and existing_map and norm_path in existing_map:
             cached_mtime, cached_size = existing_map[norm_path]
-            if cached_mtime == mtime_iso and cached_size == file_size:
-                return None, 'skipped'
+            if cached_size == file_size:
+                if cached_mtime == mtime_iso:
+                    return None, 'skipped'
+                # Check fuzzy timestamp difference (handles microsecond truncations & SMB 2-second FAT resolution)
+                try:
+                    cached_dt = datetime.fromisoformat(str(cached_mtime))
+                    disk_dt = datetime.fromtimestamp(stat.st_mtime)
+                    if abs((disk_dt - cached_dt).total_seconds()) <= 3.0:
+                        return None, 'skipped'
+                except Exception:
+                    pass
 
         # Canonical path hash for consistent document ID across drive casing
         doc_id = hashlib.sha256(norm_path.encode('utf-8')).hexdigest()
