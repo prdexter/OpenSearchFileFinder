@@ -25,14 +25,14 @@ QUICKEN_LOCAL_DST = r"D:\Quicken"
 QUICKEN_NAS_DST = r"\\Synology_NAS\Videos and pics\Quicken"
 
 # EndNote Backup Paths
-ENDNOTE_SRC = r"C:\Users\Paul Dexter\OneDrive - Indiana University\FromBox\1 My box folder\EndNote"
+ENDNOTE_SRC = r"D:\Endnote"
 ENDNOTE_FALLBACK_SRC = r"D:\Backups\Documents\Endnote"
 ENDNOTE_LOCAL_DST = r"D:\Endnote"
 ENDNOTE_NAS_DST = r"\\Synology_NAS\Videos and pics\Endnote"
 
 # Documents Backup Paths
-DOCS_SRC = r"D:\Backups\Documents"
-DOCS_NAS_DST = r"\\Synology_NAS\Videos and pics\Backup"
+DOCS_SRC = r"D:\Backups"
+DOCS_NAS_DST = r"\\Synology_NAS\Videos and pics\Backups"
 
 LOG_FILE = os.path.join(os.path.dirname(__file__), "robocopy_monitor.log")
 
@@ -57,14 +57,14 @@ def log(msg):
 def run_quicken_sync():
     log(f"[*] Syncing Quicken: '{QUICKEN_SRC}' -> '{QUICKEN_LOCAL_DST}'...")
     try:
-        cmd1 = ["robocopy", QUICKEN_SRC, QUICKEN_LOCAL_DST, "/E", "/FFT", "/R:1", "/W:1", "/MT:16", "/NFL", "/NDL"]
+        cmd1 = ["robocopy", QUICKEN_SRC, QUICKEN_LOCAL_DST, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:1", "/MT:64", "/NFL", "/NDL"]
         subprocess.run(cmd1, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e:
         log(f"[-] Quicken Local Sync error: {e}")
 
     log(f"[*] Syncing Quicken: '{QUICKEN_LOCAL_DST}' -> '{QUICKEN_NAS_DST}'...")
     try:
-        cmd2 = ["robocopy", QUICKEN_LOCAL_DST, QUICKEN_NAS_DST, "/E", "/FFT", "/R:1", "/W:1", "/MT:16", "/NFL", "/NDL"]
+        cmd2 = ["robocopy", QUICKEN_LOCAL_DST, QUICKEN_NAS_DST, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:1", "/MT:64", "/NFL", "/NDL"]
         subprocess.run(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         log(f"[OK] Quicken sync completed successfully to '{QUICKEN_NAS_DST}'")
     except Exception as e:
@@ -79,14 +79,14 @@ def run_endnote_sync():
     if os.path.normpath(src) != os.path.normpath(ENDNOTE_LOCAL_DST):
         log(f"[*] Syncing EndNote: '{src}' -> '{ENDNOTE_LOCAL_DST}'...")
         try:
-            cmd1 = ["robocopy", src, ENDNOTE_LOCAL_DST, "/E", "/FFT", "/R:1", "/W:1", "/MT:16", "/NFL", "/NDL"]
+            cmd1 = ["robocopy", src, ENDNOTE_LOCAL_DST, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:1", "/MT:64", "/NFL", "/NDL"]
             subprocess.run(cmd1, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception as e:
             log(f"[-] EndNote Local Sync error: {e}")
 
     log(f"[*] Syncing EndNote: '{ENDNOTE_LOCAL_DST}' -> '{ENDNOTE_NAS_DST}'...")
     try:
-        cmd2 = ["robocopy", ENDNOTE_LOCAL_DST, ENDNOTE_NAS_DST, "/E", "/FFT", "/R:1", "/W:1", "/MT:16", "/NFL", "/NDL"]
+        cmd2 = ["robocopy", ENDNOTE_LOCAL_DST, ENDNOTE_NAS_DST, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:1", "/MT:64", "/NFL", "/NDL"]
         subprocess.run(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         log(f"[OK] EndNote sync completed successfully to '{ENDNOTE_NAS_DST}'")
     except Exception as e:
@@ -107,7 +107,7 @@ def is_docs_robocopy_running():
 
 def start_docs_robocopy():
     log(f"[*] Launching Documents Robocopy transfer from '{DOCS_SRC}' to '{DOCS_NAS_DST}'...")
-    cmd = ["robocopy", DOCS_SRC, DOCS_NAS_DST, "/E", "/FFT", "/R:1", "/W:1", "/MT:16", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", "/NFL", "/NDL"]
+    cmd = ["robocopy", DOCS_SRC, DOCS_NAS_DST, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:1", "/MT:64", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", "/NFL", "/NDL"]
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         log(f"[OK] Documents Robocopy started successfully with PID: {proc.pid}")
