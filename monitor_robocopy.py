@@ -93,6 +93,18 @@ def run_endnote_sync():
         log(f"[-] EndNote NAS Sync error: {e}")
 
 
+def is_indexer_running():
+    for p in psutil.process_iter(['name', 'cmdline']):
+        try:
+            if p.info['name'] and 'python' in p.info['name'].lower():
+                cmd = p.info.get('cmdline') or []
+                if any('ingest_documents.py' in str(arg) for arg in cmd):
+                    return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    return False
+
+
 def is_docs_robocopy_running():
     for p in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
@@ -123,8 +135,9 @@ def main():
     log("==================================================")
 
     # Initial Sync on startup
-    run_quicken_sync()
-    run_endnote_sync()
+    if not is_indexer_running():
+        run_quicken_sync()
+        run_endnote_sync()
 
     last_io_bytes = 0
     stuck_counter = 0
@@ -132,6 +145,11 @@ def main():
 
     while True:
         try:
+            if is_indexer_running():
+                # Yield control to primary ingest_documents.py process
+                time.sleep(15)
+                continue
+
             # 1. Documents Robocopy Check
             running, pid = is_docs_robocopy_running()
             if not running:
