@@ -1057,7 +1057,7 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         # 1. Direct SAN Sync for D:\Backups
         local_backups_root = os.path.dirname(backup_dir) if backup_dir.lower().endswith(r"\documents") else backup_dir
         if sys.platform == 'win32':
-            cmd = ["robocopy", local_backups_root, network_target, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:64", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", ".dropbox.cache"]
+            cmd = ["robocopy", local_backups_root, network_target, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:64", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
             code, c1, s1 = run_robocopy_with_live_progress(cmd, label=f"Syncing backups to '{network_target}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c1
             cum_skipped += s1
@@ -1080,7 +1080,7 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
             print(f"[*] Syncing ALL file types from '{active_res_src}' directly to NAS target...")
             os.makedirs(active_res_nas, exist_ok=True)
             if sys.platform == 'win32':
-                cmd_ar = ["robocopy", active_res_src, active_res_nas, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:64", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", ".dropbox.cache"]
+                cmd_ar = ["robocopy", active_res_src, active_res_nas, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:64", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
                 returncode_ar, c2, s2 = run_robocopy_with_live_progress(cmd_ar, label=f"Syncing Active research to '{active_res_nas}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
                 cum_copied += c2
                 cum_skipped += s2

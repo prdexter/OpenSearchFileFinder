@@ -107,7 +107,7 @@ def is_docs_robocopy_running():
 
 def start_docs_robocopy():
     log(f"[*] Launching Documents Robocopy transfer from '{DOCS_SRC}' to '{DOCS_NAS_DST}'...")
-    cmd = ["robocopy", DOCS_SRC, DOCS_NAS_DST, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:1", "/MT:64", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", ".dropbox.cache", "/NFL", "/NDL"]
+    cmd = ["robocopy", DOCS_SRC, DOCS_NAS_DST, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:1", "/MT:64", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", "/NFL", "/NDL"]
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         log(f"[OK] Documents Robocopy started successfully with PID: {proc.pid}")
