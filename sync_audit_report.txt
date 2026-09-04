@@ -109,3 +109,25 @@
      Target mtime  : N/A
      Time Delta    : N/A
 ----------------------------------------------------------------------------------------
+[2026-09-04 19:38:28] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Large Variations in State Flu Vaccination Rates Foreshadow Challenges in Distributing a COVID-19 Vaccine _ Infectious Diseases _ JAMA Health Forum _ JAMA Network.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Old research projects\Covid articles\Federal support of states\Large Variations in State Flu Vaccination Rates Foreshadow Challenges in Distributing a COVID-19 Vaccine _ Infectious Diseases _ JAMA Health Forum _ JAMA Network.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Old research projects\Covid articles\Federal support of states\Large Variations in State Flu Vaccination Rates Foreshadow Challenges in Distributing a COVID-19 Vaccine _ Infectious Diseases _ JAMA Health Forum _ JAMA Network.pdf
+     Source Size   : 299,452 bytes
+     Target Size   : N/A
+     Source mtime  : 2021-01-05 23:14:58
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-04 19:38:28] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Regenstrief Institute RFP Response-The Impact of Clinical Decision Support on Hepatitis A Vaccination Coverage Rate in Children and Adults.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Old research projects\Manuscript March 2020\Related papers\Indiana papers\Regenstrief Institute RFP Response-The Impact of Clinical Decision Support on Hepatitis A Vaccination Coverage Rate in Children and Adults.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Old research projects\Manuscript March 2020\Related papers\Indiana papers\Regenstrief Institute RFP Response-The Impact of Clinical Decision Support on Hepatitis A Vaccination Coverage Rate in Children and Adults.docx
+     Source Size   : 2,216,131 bytes
+     Target Size   : N/A
+     Source mtime  : 2020-04-18 16:37:17
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------

@@ -1544,7 +1544,7 @@ def main():
             
             if net_target:
                 san_sum = build_san_summary_dict(net_target)
-                write_progress(True, total_scanned, total_indexed, total_skipped, f"⚡ Phase 3/3 (0 synced, 0 skipped): Syncing backups to network target '{net_target}'...", san_summary=san_sum)
+                write_progress(True, total_scanned, total_indexed, total_skipped, f"⚡ Phase 3/3 (Scanning NAS directory structure...): Syncing backups to network target '{net_target}'...", san_summary=san_sum)
                 sync_to_network_target(backup_dir, net_target)
         
         final_msg = f"✅ All Phases Complete ({total_scanned:,} docs checked, backups synced)!"
