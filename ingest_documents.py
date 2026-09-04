@@ -969,11 +969,12 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
     copied_count = 0
     skipped_count = 0
     
-    # Emit progress immediately at start so (X synced, Y skipped) is never missing
-    total_c = base_copied + copied_count
-    total_s = base_skipped + skipped_count
-    msg = f"⚡ Phase 3/3 ({total_c:,} synced, {total_s:,} skipped): {label}"
-    write_progress(True, total_c + total_s, total_c, total_s, msg, san_summary=san_summary)
+    # Emit progress immediately at start
+    if base_copied == 0 and base_skipped == 0:
+        msg = f"⚡ Phase 3/3 (Scanning NAS directory structure...): {label}"
+    else:
+        msg = f"⚡ Phase 3/3 ({base_copied:,} synced, {base_skipped:,} skipped): {label}"
+    write_progress(True, base_copied + base_skipped, base_copied, base_skipped, msg, san_summary=san_summary)
 
     output_lines = []
 
