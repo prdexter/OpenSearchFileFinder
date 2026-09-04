@@ -1,0 +1,45 @@
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-04 19:25:08
+ Audit Execution Time      : 6.41 seconds
+ Candidate Files Inspected : 197
+ Total Files Requiring Sync: 3
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : sync_audit_report.txt
+     Relative Path : sync_audit_report.txt
+     Source Path   : D:\Active research\OpenSearch\sync_audit_report.txt
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\sync_audit_report.txt
+     Source Size   : 6,383 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 19:24:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : SIZE_MISMATCH (Source: 8,259 bytes | Target: 7,116 bytes)
+     File Name     : generate_sync_audit_report.py
+     Relative Path : generate_sync_audit_report.py
+     Source Path   : D:\Active research\OpenSearch\generate_sync_audit_report.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\generate_sync_audit_report.py
+     Source Size   : 8,259 bytes
+     Target Size   : 7,116 bytes
+     Source mtime  : 2026-09-04 19:24:55
+     Target mtime  : 2026-09-04 19:24:11
+     Time Delta    : 43.86s
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : SIZE_MISMATCH (Source: 1,387 bytes | Target: 1,379 bytes)
+     File Name     : indexer_progress.json
+     Relative Path : indexer_progress.json
+     Source Path   : D:\Active research\OpenSearch\indexer_progress.json
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\indexer_progress.json
+     Source Size   : 1,387 bytes
+     Target Size   : 1,379 bytes
+     Source mtime  : 2026-09-04 19:25:02
+     Target mtime  : 2026-09-04 19:24:15
+     Time Delta    : 47.32s
+----------------------------------------------------------------------------------------
