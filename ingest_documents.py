@@ -690,11 +690,42 @@ def fetch_existing_metadata(client, index_name="documents"):
     return existing_map
 
 
+SYNC_AUDIT_LOG_FILE = os.path.join(os.path.dirname(__file__), "sync_audit_report.txt")
+SYNC_AUDIT_LOCK = threading.Lock()
+
+def record_sync_event(action_label: str, src_path: str, dest_path: str, reason: str, src_size: int, dest_size: int = None, src_mtime: float = None, dest_mtime: float = None):
+    """Instantly appends sync audit entries to sync_audit_report.txt in real time."""
+    try:
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        s_dt = datetime.fromtimestamp(src_mtime).strftime("%Y-%m-%d %H:%M:%S") if src_mtime else "N/A"
+        d_dt = datetime.fromtimestamp(dest_mtime).strftime("%Y-%m-%d %H:%M:%S") if dest_mtime else "N/A"
+        d_sz = f"{dest_size:,} bytes" if dest_size is not None else "N/A"
+        delta_str = f"{abs(dest_mtime - src_mtime):.2f}s" if (dest_mtime and src_mtime) else "N/A"
+
+        entry = (
+            f"[{now_str}] SYNC EVENT: {action_label}\n"
+            f"     Prompt Reason : {reason}\n"
+            f"     File Name     : {os.path.basename(src_path)}\n"
+            f"     Source Path   : {src_path}\n"
+            f"     Target Path   : {dest_path}\n"
+            f"     Source Size   : {src_size:,} bytes\n"
+            f"     Target Size   : {d_sz}\n"
+            f"     Source mtime  : {s_dt}\n"
+            f"     Target mtime  : {d_dt}\n"
+            f"     Time Delta    : {delta_str}\n"
+            "----------------------------------------------------------------------------------------\n"
+        )
+        with SYNC_AUDIT_LOCK:
+            with open(SYNC_AUDIT_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(entry)
+    except Exception:
+        pass
+
+
 def copy_file_to_backup(file_path: str, backup_dir: str) -> str:
     """
     Mirrors file_path into backup_dir preserving directory structure.
-    Returns destination path on success, or None on failure.
-    Fast skip if dest_path exists and has matching size.
+    Logs sync reason (NEW_FILE, SIZE_MISMATCH, TIMESTAMP_DRIFT) to sync_audit_report.txt in real time.
     """
     if not backup_dir:
         return None
@@ -707,12 +738,32 @@ def copy_file_to_backup(file_path: str, backup_dir: str) -> str:
         drive, rel_path = os.path.splitdrive(file_path)
         clean_rel = rel_path.lstrip('\\').lstrip('/')
         dest_path = os.path.join(backup_dir, clean_rel)
+
+        s_stat = os.stat(file_path)
+        src_size = s_stat.st_size
+        src_mtime = s_stat.st_mtime
+
         if os.path.exists(dest_path):
             try:
-                if os.path.getsize(dest_path) == os.path.getsize(file_path):
+                d_stat = os.stat(dest_path)
+                dest_size = d_stat.st_size
+                dest_mtime = d_stat.st_mtime
+                delta = abs(dest_mtime - src_mtime)
+
+                if src_size == dest_size and delta <= 3.0:
                     return dest_path
+                elif src_size != dest_size:
+                    reason = f"SIZE_MISMATCH (Source: {src_size:,} bytes | Target: {dest_size:,} bytes)"
+                else:
+                    reason = f"TIMESTAMP_DRIFT (Delta: {delta:.2f}s > 3.0s threshold)"
+
+                record_sync_event("Local D:\\ Backup", file_path, dest_path, reason, src_size, dest_size, src_mtime, dest_mtime)
             except Exception:
                 pass
+        else:
+            reason = "NEW_FILE (Target file missing on local backup)"
+            record_sync_event("Local D:\\ Backup", file_path, dest_path, reason, src_size, None, src_mtime, None)
+
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
         import shutil
         shutil.copy2(file_path, dest_path)
