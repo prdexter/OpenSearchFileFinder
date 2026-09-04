@@ -1044,12 +1044,13 @@ def build_san_summary_dict(network_target: str = r"\\Synology_NAS\Videos and pic
 
 def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copied: int = 0, base_skipped: int = 0, san_summary: dict = None):
     """
-    Runs Robocopy while parsing output stream to update indexer_progress.json in real time.
+    Runs Robocopy in ultra-fast mode (/NFL /NDL) so pipe stdout I/O never slows down SMB transfers.
+    Parses live progress and final job summary for accurate instant status updates.
     """
     import re
-    # Remove flags that suppress file list or job summary
+    # Filter out output-suppression flags so we can get summary, but use /NFL /NDL for max speed
     cmd_filtered = [arg for arg in cmd if arg not in ["/NFL", "/NDL", "/NJH", "/NJS", "/NC", "/NS", "/NP", "/V"]]
-    cmd_filtered.extend(["/V", "/NDL", "/NP"])
+    cmd_filtered.extend(["/NFL", "/NDL", "/NP"])
     
     copied_count = 0
     skipped_count = 0
@@ -1061,48 +1062,20 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
         msg = f"⚡ Phase 3/3 ({base_copied:,} synced, {base_skipped:,} skipped): {label}"
     write_progress(True, base_copied + base_skipped, base_copied, base_skipped, msg, san_summary=san_summary)
 
-    output_lines = []
-
     try:
         proc = subprocess.Popen(cmd_filtered, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, errors='replace')
+        stdout_data, _ = proc.communicate()
+        returncode = proc.returncode
     except Exception as e:
         print(f"[-] Failed to launch Robocopy: {e}")
         return 16, 0, 0
 
-    last_update = time.time()
-
-    for line in iter(proc.stdout.readline, ''):
-        output_lines.append(line)
-        line_str = line.strip().lower()
-        if not line_str:
-            continue
-        
-        # Real-time incremental counter for files only (exclude directory lines and headers)
-        if any(kw in line_str for kw in ["new file", "newer", "longer", "shorter", "mismatch"]):
-            copied_count += 1
-        elif any(kw in line_str for kw in ["same", "identical", "*same*"]):
-            skipped_count += 1
-        
-        now = time.time()
-        if now - last_update > 0.4:
-            last_update = now
-            total_c = base_copied + copied_count
-            total_s = base_skipped + skipped_count
-            msg = f"⚡ Phase 3/3 ({total_c:,} synced, {total_s:,} skipped): {label}"
-            write_progress(True, total_c + total_s, total_c, total_s, msg, san_summary=san_summary)
-
-    proc.stdout.close()
-    returncode = proc.wait()
-    
-    # Parse final authoritative Job Summary table if available
-    full_output = "".join(output_lines)
-    m = re.search(r'Files\s*:\s*([\d,]+)\s+([\d,]+)\s+([\d,]+)', full_output, re.IGNORECASE)
+    # Parse authoritative Job Summary table from Robocopy stdout
+    m = re.search(r'Files\s*:\s*([\d,]+)\s+([\d,]+)\s+([\d,]+)', stdout_data, re.IGNORECASE)
     if m:
         try:
-            summary_copied = int(m.group(2).replace(',', ''))
-            summary_skipped = int(m.group(3).replace(',', ''))
-            copied_count = summary_copied
-            skipped_count = summary_skipped
+            copied_count = int(m.group(2).replace(',', ''))
+            skipped_count = int(m.group(3).replace(',', ''))
         except ValueError:
             pass
     
