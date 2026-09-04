@@ -32,6 +32,7 @@ from http.server import HTTPServer, ThreadingHTTPServer, SimpleHTTPRequestHandle
 from urllib.parse import parse_qs, urlparse
 from datetime import datetime
 from pathlib import Path
+import psutil
 from opensearchpy import OpenSearch
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 import fitz  # PyMuPDF for PDF thumbnail rendering
@@ -1478,14 +1479,14 @@ def check_indexer_process_running():
     if INDEXER_PROCESS is not None and INDEXER_PROCESS.poll() is None:
         return True
 
-    prog_file = os.path.join(os.path.dirname(__file__), "indexer_progress.json")
-    if os.path.exists(prog_file):
+    # Inspect OS process tree to verify if ingest_documents.py is active
+    for p in psutil.process_iter(['name', 'cmdline']):
         try:
-            with open(prog_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if data.get("is_running") and (time.time() - data.get("timestamp", 0)) < 30:
-                return True
-        except Exception:
+            if p.info['name'] and 'python' in p.info['name'].lower():
+                cmd = p.info.get('cmdline') or []
+                if any('ingest_documents.py' in str(arg) for arg in cmd):
+                    return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
             pass
     return False
 
@@ -1655,7 +1656,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
                     pass
                     
             msg = progress.get("status_message", "")
-            if not is_running and not msg:
+            if not is_running:
                 msg = ""
             elif is_running and not msg:
                 msg = "Indexing active in background..."
