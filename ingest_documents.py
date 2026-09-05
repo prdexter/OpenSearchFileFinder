@@ -1133,8 +1133,11 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         # Audit NAS sync candidates to sync_audit_report.txt before starting transfers
         try:
             from generate_sync_audit_report import generate_full_audit_report
-            def audit_progress(checked, total, drift_count):
-                msg = f"⚡ Phase 3/3 Audit ({checked:,}/{total:,} checked, {drift_count:,} drift/missing): Scanning NAS..."
+            def audit_progress(checked, total, drift_count, is_collecting=False):
+                if is_collecting:
+                    msg = f"⚡ Phase 3/3 Audit (Discovered {checked:,} candidate files so far...): Scanning local drives..."
+                else:
+                    msg = f"⚡ Phase 3/3 Audit ({checked:,}/{total:,} checked, {drift_count:,} drift/missing): Scanning NAS across 128 threads..."
                 write_progress(True, checked, 0, drift_count, msg, san_summary=san_summary)
             generate_full_audit_report(progress_callback=audit_progress)
         except Exception as e_audit:
@@ -1143,7 +1146,7 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         # 1. Direct SAN Sync for D:\Backups
         local_backups_root = os.path.dirname(backup_dir) if backup_dir.lower().endswith(r"\documents") else backup_dir
         if sys.platform == 'win32':
-            cmd = ["robocopy", local_backups_root, network_target, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:64", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
+            cmd = ["robocopy", local_backups_root, network_target, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
             code, c1, s1 = run_robocopy_with_live_progress(cmd, label=f"Syncing backups to '{network_target}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c1
             cum_skipped += s1
@@ -1166,7 +1169,7 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
             print(f"[*] Syncing ALL file types from '{active_res_src}' directly to NAS target...")
             os.makedirs(active_res_nas, exist_ok=True)
             if sys.platform == 'win32':
-                cmd_ar = ["robocopy", active_res_src, active_res_nas, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:64", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
+                cmd_ar = ["robocopy", active_res_src, active_res_nas, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
                 returncode_ar, c2, s2 = run_robocopy_with_live_progress(cmd_ar, label=f"Syncing Active research to '{active_res_nas}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
                 cum_copied += c2
                 cum_skipped += s2
@@ -1193,11 +1196,11 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         if os.path.exists(src_e) and sys.platform == 'win32':
             print(f"[*] Syncing EndNote from '{src_e}' to SAN target '{endnote_nas_dst}'...")
             if os.path.normpath(src_e) != os.path.normpath(endnote_local_dst):
-                cmd_e1 = ["robocopy", src_e, endnote_local_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:64", "/NFL", "/NDL"]
+                cmd_e1 = ["robocopy", src_e, endnote_local_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/NFL", "/NDL"]
                 code_e1, c_e1, s_e1 = run_robocopy_with_live_progress(cmd_e1, label=f"Local EndNote sync to '{endnote_local_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
                 cum_copied += c_e1
                 cum_skipped += s_e1
-            cmd_e2 = ["robocopy", endnote_local_dst, endnote_nas_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:64", "/NFL", "/NDL"]
+            cmd_e2 = ["robocopy", endnote_local_dst, endnote_nas_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/NFL", "/NDL"]
             returncode_e, c_e2, s_e2 = run_robocopy_with_live_progress(cmd_e2, label=f"Syncing EndNote to '{endnote_nas_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c_e2
             cum_skipped += s_e2
@@ -1221,11 +1224,11 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         quicken_nas_dst = r"\\Synology_NAS\Videos and pics\Quicken"
         if os.path.exists(quicken_src) and sys.platform == 'win32':
             print(f"[*] Syncing Quicken from '{quicken_src}' to SAN target '{quicken_nas_dst}'...")
-            cmd_q1 = ["robocopy", quicken_src, quicken_local_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:64", "/NFL", "/NDL"]
+            cmd_q1 = ["robocopy", quicken_src, quicken_local_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/NFL", "/NDL"]
             code_q1, c_q1, s_q1 = run_robocopy_with_live_progress(cmd_q1, label=f"Local Quicken sync to '{quicken_local_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c_q1
             cum_skipped += s_q1
-            cmd_q2 = ["robocopy", quicken_local_dst, quicken_nas_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:64", "/NFL", "/NDL"]
+            cmd_q2 = ["robocopy", quicken_local_dst, quicken_nas_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/NFL", "/NDL"]
             returncode_q, c_q2, s_q2 = run_robocopy_with_live_progress(cmd_q2, label=f"Syncing Quicken to '{quicken_nas_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c_q2
             cum_skipped += s_q2

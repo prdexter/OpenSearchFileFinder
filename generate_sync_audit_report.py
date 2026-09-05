@@ -85,7 +85,7 @@ def check_file_pair(item):
     return None
 
 
-def collect_fast_pairs(label, src_dir, dst_dir, max_files=None):
+def collect_fast_pairs(label, src_dir, dst_dir, max_files=None, progress_callback=None, initial_count=0):
     if not os.path.exists(src_dir):
         return []
     exclude_names = {'__pycache__', '.git', 'node_modules', '.venv', 'venv', '.cache', '.cache_thumbnails', 'appdata', 'identified'}
@@ -93,6 +93,7 @@ def collect_fast_pairs(label, src_dir, dst_dir, max_files=None):
 
     pairs = []
     stack = [(src_dir, dst_dir, "")]
+    last_cb = 0.0
 
     while stack:
         s_curr, d_curr, rel_curr = stack.pop()
@@ -110,6 +111,10 @@ def collect_fast_pairs(label, src_dir, dst_dir, max_files=None):
                     if ext in exclude_exts:
                         continue
                     pairs.append((label, entry.path, os.path.join(dst_dir, rel_path), rel_path))
+                    now = time.time()
+                    if progress_callback and now - last_cb >= 0.3:
+                        progress_callback(initial_count + len(pairs), 0, 0, is_collecting=True)
+                        last_cb = now
                 elif entry.is_dir(follow_symlinks=False):
                     stack.append((entry.path, dst_dir, rel_path))
         except Exception:
@@ -125,35 +130,35 @@ def generate_full_audit_report(progress_callback=None):
     nas_target_dir = r"\\Synology_NAS\Videos and pics\Backups"
 
     print(" -> Collecting file pairs for Local D:\\Backups vs NAS...", flush=True)
-    b_pairs = collect_fast_pairs("SAN Sync: D:\\Backups -> NAS", r"D:\Backups", nas_target_dir)
+    b_pairs = collect_fast_pairs("SAN Sync: D:\\Backups -> NAS", r"D:\Backups", nas_target_dir, progress_callback=progress_callback, initial_count=len(pairs))
     pairs.extend(b_pairs)
     print(f"    Collected {len(b_pairs):,} file pairs for D:\\Backups.", flush=True)
 
     print(" -> Collecting file pairs for OpenSearch project vs NAS...", flush=True)
-    o_pairs = collect_fast_pairs("SAN Sync: OpenSearch -> NAS", r"D:\Active research\OpenSearch", os.path.join(nas_target_dir, "Active research", "OpenSearch"))
+    o_pairs = collect_fast_pairs("SAN Sync: OpenSearch -> NAS", r"D:\Active research\OpenSearch", os.path.join(nas_target_dir, "Active research", "OpenSearch"), progress_callback=progress_callback, initial_count=len(pairs))
     pairs.extend(o_pairs)
     print(f"    Collected {len(o_pairs):,} file pairs for OpenSearch.", flush=True)
 
     endnote_src = r"D:\Endnote" if os.path.exists(r"D:\Endnote") else r"D:\Backups\Documents\Endnote"
     print(" -> Collecting file pairs for EndNote vs NAS...", flush=True)
-    e_pairs = collect_fast_pairs("SAN Sync: EndNote -> NAS", endnote_src, r"\\Synology_NAS\Videos and pics\Endnote")
+    e_pairs = collect_fast_pairs("SAN Sync: EndNote -> NAS", endnote_src, r"\\Synology_NAS\Videos and pics\Endnote", progress_callback=progress_callback, initial_count=len(pairs))
     pairs.extend(e_pairs)
     print(f"    Collected {len(e_pairs):,} file pairs for EndNote.", flush=True)
 
     quicken_src = r"C:\Users\Paul Dexter\OneDrive\Finances and family\Quicken"
     print(" -> Collecting file pairs for Quicken vs NAS...", flush=True)
-    q_pairs = collect_fast_pairs("SAN Sync: Quicken -> NAS", quicken_src, r"\\Synology_NAS\Videos and pics\Quicken")
+    q_pairs = collect_fast_pairs("SAN Sync: Quicken -> NAS", quicken_src, r"\\Synology_NAS\Videos and pics\Quicken", progress_callback=progress_callback, initial_count=len(pairs))
     pairs.extend(q_pairs)
     print(f"    Collected {len(q_pairs):,} file pairs for Quicken.", flush=True)
 
-    print(f"[*] Checking {len(pairs):,} total candidate files against NAS using 32 parallel threads...", flush=True)
+    print(f"[*] Checking {len(pairs):,} total candidate files against NAS using 128 parallel threads...", flush=True)
     all_events = []
     checked_count = 0
     mismatch_count = 0
     total_pairs = len(pairs)
     last_cb = 0.0
 
-    with ThreadPoolExecutor(max_workers=32) as executor:
+    with ThreadPoolExecutor(max_workers=128) as executor:
         futures = [executor.submit(check_file_pair, p) for p in pairs]
         for fut in as_completed(futures):
             res = fut.result()
@@ -163,7 +168,7 @@ def generate_full_audit_report(progress_callback=None):
                 mismatch_count += 1
             now = time.time()
             if progress_callback and (now - last_cb >= 0.3 or checked_count == total_pairs):
-                progress_callback(checked_count, total_pairs, mismatch_count)
+                progress_callback(checked_count, total_pairs, mismatch_count, is_collecting=False)
                 last_cb = now
             if now - last_cb >= 1.0 or checked_count == total_pairs:
                 print(f"\r -> Checked {checked_count:,}/{total_pairs:,} candidate files... ({mismatch_count:,} drift/missing)", end="", flush=True)
