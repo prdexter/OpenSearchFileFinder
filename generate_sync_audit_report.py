@@ -216,6 +216,7 @@ def generate_full_audit_report(progress_callback=None):
 
     print(f"[✓] Sync Audit Report successfully written to: {REPORT_FILE}", flush=True)
     print(f"[+] Total files requiring sync across all targets: {len(all_events):,} (Completed in {elapsed:.2f}s)", flush=True)
+    return all_events
 
 
 if __name__ == "__main__":
