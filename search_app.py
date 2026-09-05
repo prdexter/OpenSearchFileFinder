@@ -1184,7 +1184,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                         badge.style.display = 'inline-block';
                         
                         if (data.status_message) {
-                            badge.innerText = '⏳ ' + data.status_message;
+                            const msg = data.status_message;
+                            badge.innerText = (msg.startsWith('⚡') || msg.startsWith('🔍') || msg.startsWith('✅') || msg.startsWith('⏳')) ? msg : '⏳ ' + msg;
                         } else {
                             badge.innerText = '⚡ Indexing active in background...';
                         }
@@ -1921,10 +1922,13 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 self.send_json({"status": "error", "message": str(e)}, status=500)
 
     def send_json(self, data, status=200):
-        self.send_response(status)
-        self.send_header("Content-Type", "json/application; charset=utf-8")
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode('utf-8'))
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode('utf-8'))
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+            pass
 
 
 def main():

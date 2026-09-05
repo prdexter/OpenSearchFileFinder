@@ -5425,3 +5425,69 @@
      Target mtime  : 2026-09-04 20:51:20
      Time Delta    : 1226.92s
 ----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-04 22:01:16
+ Audit Execution Time      : 326.43 seconds
+ Candidate Files Inspected : 127,519
+ Total Files Requiring Sync: 3
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : SIZE_MISMATCH (Source: 10,124 bytes | Target: 10,102 bytes)
+     File Name     : generate_sync_audit_report.py
+     Relative Path : generate_sync_audit_report.py
+     Source Path   : \\?\D:\Active research\OpenSearch\generate_sync_audit_report.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\generate_sync_audit_report.py
+     Source Size   : 10,124 bytes
+     Target Size   : 10,102 bytes
+     Source mtime  : 2026-09-04 21:40:13
+     Target mtime  : 2026-09-04 20:51:14
+     Time Delta    : 2939.30s
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : SIZE_MISMATCH (Source: 68,700 bytes | Target: 67,815 bytes)
+     File Name     : ingest_documents.py
+     Relative Path : ingest_documents.py
+     Source Path   : \\?\D:\Active research\OpenSearch\ingest_documents.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\ingest_documents.py
+     Source Size   : 68,700 bytes
+     Target Size   : 67,815 bytes
+     Source mtime  : 2026-09-04 21:53:09
+     Target mtime  : 2026-09-04 21:11:46
+     Time Delta    : 2482.73s
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : SIZE_MISMATCH (Source: 88,334 bytes | Target: 88,046 bytes)
+     File Name     : search_app.py
+     Relative Path : search_app.py
+     Source Path   : \\?\D:\Active research\OpenSearch\search_app.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\search_app.py
+     Source Size   : 88,334 bytes
+     Target Size   : 88,046 bytes
+     Source mtime  : 2026-09-04 21:53:26
+     Target mtime  : 2026-09-04 19:01:49
+     Time Delta    : 10296.23s
+----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-04 22:07:05
+ Audit Execution Time      : 127.21 seconds
+ Candidate Files Inspected : 127,519
+ Total Files Requiring Sync: 1
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : SIZE_MISMATCH (Source: 68,694 bytes | Target: 68,700 bytes)
+     File Name     : ingest_documents.py
+     Relative Path : ingest_documents.py
+     Source Path   : \\?\D:\Active research\OpenSearch\ingest_documents.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\ingest_documents.py
+     Source Size   : 68,694 bytes
+     Target Size   : 68,700 bytes
+     Source mtime  : 2026-09-04 22:01:54
+     Target mtime  : 2026-09-04 21:53:09
+     Time Delta    : 524.88s
+----------------------------------------------------------------------------------------

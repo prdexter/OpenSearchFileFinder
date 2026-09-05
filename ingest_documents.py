@@ -1045,8 +1045,11 @@ def build_san_summary_dict(network_target: str = r"\\Synology_NAS\Videos and pic
 def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copied: int = 0, base_skipped: int = 0, san_summary: dict = None, phase_prefix: str = "⚡ Phase 3/3"):
     """
     Runs Robocopy with /V /NP /NJH and parses live stdout streaming for dynamic progress updates.
+    Includes an active heartbeat status while Robocopy builds and compares remote directory trees over SMB.
     """
     import re
+    import threading
+
     # Remove flags that suppress stdout file output or summary
     cmd_filtered = [arg for arg in cmd if arg not in ["/NFL", "/NDL", "/NJH", "/NJS", "/NC", "/NS", "/NP", "/V"]]
     cmd_filtered.extend(["/V", "/NP", "/NJH"])
@@ -1056,11 +1059,34 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
     
     last_update_t = 0.0
     stdout_lines = []
-    
+    start_time = time.time()
+    first_line_received = threading.Event()
+    stop_heartbeat = threading.Event()
+
+    # Initial status update immediately informing user of directory comparison
+    initial_msg = f"{phase_prefix} [Scanning directory trees over network...]: {label}"
+    write_progress(True, base_copied + base_skipped, base_copied, base_skipped, initial_msg, san_summary=san_summary)
+
+    def _heartbeat():
+        while not stop_heartbeat.is_set():
+            time.sleep(1.0)
+            if stop_heartbeat.is_set():
+                break
+            if not first_line_received.is_set():
+                elapsed = int(time.time() - start_time)
+                msg = f"{phase_prefix} [Comparing network directory trees ({elapsed}s elapsed)...]: {label}"
+                write_progress(True, base_copied + base_skipped, base_copied, base_skipped, msg, san_summary=san_summary)
+
+    heartbeat_thread = threading.Thread(target=_heartbeat, daemon=True)
+    heartbeat_thread.start()
+
+    returncode = 16
     try:
         proc = subprocess.Popen(cmd_filtered, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, errors='replace')
         
         for line in iter(proc.stdout.readline, ''):
+            if not first_line_received.is_set():
+                first_line_received.set()
             stdout_lines.append(line)
             l = line.strip()
             if not l:
@@ -1069,9 +1095,9 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
             low = l.lower()
             if " dir" in low or low.endswith("\\") or low.endswith("/"):
                 continue  # Skip directory headers so only file operations are counted
-            if "same" in low or "fix " in low:
+            if any(k in low for k in ["same", "fix ", "modified", "tweaked"]):
                 skipped_count += 1
-            elif any(k in low for k in ["new file", "newer", "older"]) or ("modified" in low and "fix" not in low):
+            elif any(k in low for k in ["new file", "newer", "older", "changed"]):
                 copied_count += 1
             
             now = time.time()
@@ -1088,13 +1114,16 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
         stdout_data = "".join(stdout_lines)
     except Exception as e:
         print(f"[-] Failed to launch Robocopy: {e}")
-        return 16, 0, 0
+        returncode = 16
+    finally:
+        first_line_received.set()
+        stop_heartbeat.set()
 
     total_c = base_copied + copied_count
     total_s = base_skipped + skipped_count
     total_chk = total_c + total_s
     final_msg = f"{phase_prefix} ({total_c:,} synced, {total_s:,} skipped / {total_chk:,} checked): {label} complete"
-    write_progress(True, total_c + total_s, total_c, total_s, final_msg, san_summary=san_summary)
+    write_progress(True, total_chk, total_c, total_s, final_msg, san_summary=san_summary)
     return returncode, copied_count, skipped_count
 
 
@@ -1142,7 +1171,7 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         # 1. Direct SAN Sync for D:\Backups
         local_backups_root = os.path.dirname(backup_dir) if backup_dir.lower().endswith(r"\documents") else backup_dir
         if sys.platform == 'win32':
-            cmd = ["robocopy", local_backups_root, network_target, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", "scratch", "temp", "Active research", "EndNote", "Quicken", "/XF", "indexer_config.json", "indexer_progress.json", "sync_progress.json", "robocopy_monitor.log", "sync_audit_report.txt"]
+            cmd = ["robocopy", local_backups_root, network_target, "/MIR", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", "scratch", "temp", "Active research", "EndNote", "Quicken", "/XF", "indexer_config.json", "indexer_progress.json", "sync_progress.json", "robocopy_monitor.log", "sync_audit_report.txt"]
             code, c1, s1 = run_robocopy_with_live_progress(cmd, label=f"Syncing backups to '{network_target}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c1
             cum_skipped += s1
@@ -1165,7 +1194,7 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
             print(f"[*] Syncing ALL file types from '{active_res_src}' directly to NAS target...")
             os.makedirs(active_res_nas, exist_ok=True)
             if sys.platform == 'win32':
-                cmd_ar = ["robocopy", active_res_src, active_res_nas, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", "scratch", "temp", "/XF", "indexer_config.json", "indexer_progress.json", "sync_progress.json", "robocopy_monitor.log", "sync_audit_report.txt"]
+                cmd_ar = ["robocopy", active_res_src, active_res_nas, "/MIR", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", "scratch", "temp", "/XF", "indexer_config.json", "indexer_progress.json", "sync_progress.json", "robocopy_monitor.log", "sync_audit_report.txt"]
                 returncode_ar, c2, s2 = run_robocopy_with_live_progress(cmd_ar, label=f"Syncing Active research to '{active_res_nas}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
                 cum_copied += c2
                 cum_skipped += s2
@@ -1192,11 +1221,11 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         if os.path.exists(src_e) and sys.platform == 'win32':
             print(f"[*] Syncing EndNote from '{src_e}' to SAN target '{endnote_nas_dst}'...")
             if os.path.normpath(src_e) != os.path.normpath(endnote_local_dst):
-                cmd_e1 = ["robocopy", src_e, endnote_local_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/NFL", "/NDL"]
+                cmd_e1 = ["robocopy", src_e, endnote_local_dst, "/E", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/NFL", "/NDL"]
                 code_e1, c_e1, s_e1 = run_robocopy_with_live_progress(cmd_e1, label=f"Local EndNote sync to '{endnote_local_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
                 cum_copied += c_e1
                 cum_skipped += s_e1
-            cmd_e2 = ["robocopy", endnote_local_dst, endnote_nas_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/NFL", "/NDL"]
+            cmd_e2 = ["robocopy", endnote_local_dst, endnote_nas_dst, "/E", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/NFL", "/NDL"]
             returncode_e, c_e2, s_e2 = run_robocopy_with_live_progress(cmd_e2, label=f"Syncing EndNote to '{endnote_nas_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c_e2
             cum_skipped += s_e2
@@ -1220,11 +1249,11 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         quicken_nas_dst = r"\\Synology_NAS\Videos and pics\Quicken"
         if os.path.exists(quicken_src) and sys.platform == 'win32':
             print(f"[*] Syncing Quicken from '{quicken_src}' to SAN target '{quicken_nas_dst}'...")
-            cmd_q1 = ["robocopy", quicken_src, quicken_local_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/NFL", "/NDL"]
+            cmd_q1 = ["robocopy", quicken_src, quicken_local_dst, "/E", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/NFL", "/NDL"]
             code_q1, c_q1, s_q1 = run_robocopy_with_live_progress(cmd_q1, label=f"Local Quicken sync to '{quicken_local_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c_q1
             cum_skipped += s_q1
-            cmd_q2 = ["robocopy", quicken_local_dst, quicken_nas_dst, "/E", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/NFL", "/NDL"]
+            cmd_q2 = ["robocopy", quicken_local_dst, quicken_nas_dst, "/E", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/NFL", "/NDL"]
             returncode_q, c_q2, s_q2 = run_robocopy_with_live_progress(cmd_q2, label=f"Syncing Quicken to '{quicken_nas_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c_q2
             cum_skipped += s_q2
@@ -1295,7 +1324,7 @@ def backup_full_directory(src_dir: str, backup_dir: str):
         import subprocess
         if sys.platform == 'win32':
             cmd = ["robocopy", src_dir, dest_dir, "/MIR", "/FFT", "/R:2", "/W:2", "/MT:16", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified"]
-            res_code = run_robocopy_with_live_progress(cmd, label=f"Full backup '{os.path.basename(src_dir)}'")
+            res_code, _, _ = run_robocopy_with_live_progress(cmd, label=f"Full backup '{os.path.basename(src_dir)}'", phase_prefix="⚡ Phase 2/3")
             if res_code <= 7:
                 print(f"[✓] Full backup complete for '{src_dir}' -> '{dest_dir}'!")
             else:
