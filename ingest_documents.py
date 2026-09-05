@@ -1150,7 +1150,7 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         # 1. Direct SAN Sync for D:\Backups
         local_backups_root = os.path.dirname(backup_dir) if backup_dir.lower().endswith(r"\documents") else backup_dir
         if sys.platform == 'win32':
-            cmd = ["robocopy", local_backups_root, network_target, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", "scratch", "temp", "/XF", "indexer_config.json", "indexer_progress.json", "sync_progress.json", "robocopy_monitor.log", "sync_audit_report.txt"]
+            cmd = ["robocopy", local_backups_root, network_target, "/MIR", "/FFT", "/DCOPY:DAT", "/TIMFIX", "/J", "/R:1", "/W:2", "/MT:128", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", "scratch", "temp", "Active research", "EndNote", "Quicken", "/XF", "indexer_config.json", "indexer_progress.json", "sync_progress.json", "robocopy_monitor.log", "sync_audit_report.txt"]
             code, c1, s1 = run_robocopy_with_live_progress(cmd, label=f"Syncing backups to '{network_target}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c1
             cum_skipped += s1
