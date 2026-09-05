@@ -1076,8 +1076,9 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
             if now - last_update_t >= 0.3:
                 total_c = base_copied + copied_count
                 total_s = base_skipped + skipped_count
-                msg = f"⚡ Phase 3/3 ({total_c:,} synced, {total_s:,} checked): {label}"
-                write_progress(True, total_c + total_s, total_c, total_s, msg, san_summary=san_summary)
+                total_chk = total_c + total_s
+                msg = f"⚡ Phase 3/3 ({total_c:,} synced, {total_s:,} skipped / {total_chk:,} checked): {label}"
+                write_progress(True, total_chk, total_c, total_s, msg, san_summary=san_summary)
                 last_update_t = now
                 
         proc.wait()
@@ -1098,7 +1099,8 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
     
     total_c = base_copied + copied_count
     total_s = base_skipped + skipped_count
-    final_msg = f"⚡ Phase 3/3 ({total_c:,} synced, {total_s:,} checked): {label} complete"
+    total_chk = total_c + total_s
+    final_msg = f"⚡ Phase 3/3 ({total_c:,} synced, {total_s:,} skipped / {total_chk:,} checked): {label} complete"
     write_progress(True, total_c + total_s, total_c, total_s, final_msg, san_summary=san_summary)
     return returncode, copied_count, skipped_count
 
