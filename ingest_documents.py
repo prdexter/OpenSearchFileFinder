@@ -1125,18 +1125,19 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
     try:
         os.makedirs(network_target, exist_ok=True)
 
-        # Audit NAS sync candidates to sync_audit_report.txt before starting transfers
+        # Launch Audit report scanner asynchronously in background thread so Robocopy starts immediately
         try:
+            import threading
             from generate_sync_audit_report import generate_full_audit_report
-            def audit_progress(checked, total, drift_count, is_collecting=False):
-                if is_collecting:
-                    msg = f"⚡ Phase 3/3 Audit (Discovered {checked:,} candidate files so far...): Scanning local drives..."
-                else:
-                    msg = f"⚡ Phase 3/3 Audit ({checked:,}/{total:,} checked, {drift_count:,} drift/missing): Scanning NAS across 128 threads..."
-                write_progress(True, checked, 0, drift_count, msg, san_summary=san_summary)
-            generate_full_audit_report(progress_callback=audit_progress)
+            def _async_audit():
+                try:
+                    generate_full_audit_report()
+                except Exception as e_bg:
+                    print(f"[-] Background audit scanner error: {e_bg}")
+            audit_thread = threading.Thread(target=_async_audit, daemon=True)
+            audit_thread.start()
         except Exception as e_audit:
-            print(f"[-] Audit log error: {e_audit}")
+            print(f"[-] Failed to launch background audit: {e_audit}")
 
         # 1. Direct SAN Sync for D:\Backups
         local_backups_root = os.path.dirname(backup_dir) if backup_dir.lower().endswith(r"\documents") else backup_dir
