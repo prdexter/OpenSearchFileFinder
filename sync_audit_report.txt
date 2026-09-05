@@ -142,3 +142,468 @@
      Target mtime  : N/A
      Time Delta    : N/A
 ----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-04 20:08:10
+ Audit Execution Time      : 0.92 seconds
+ Candidate Files Inspected : 197
+ Total Files Requiring Sync: 38
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : AGENTS.md
+     Relative Path : .agents\AGENTS.md
+     Source Path   : D:\Active research\OpenSearch\.agents\AGENTS.md
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\.agents\AGENTS.md
+     Source Size   : 336 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-08-01 15:15:06
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Apply_X1_Firewall_Rules.cmd
+     Relative Path : Apply_X1_Firewall_Rules.cmd
+     Source Path   : D:\Active research\OpenSearch\Apply_X1_Firewall_Rules.cmd
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\Apply_X1_Firewall_Rules.cmd
+     Source Size   : 474 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-08-11 15:29:35
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : capture_explorer_proof.ps1
+     Relative Path : capture_explorer_proof.ps1
+     Source Path   : D:\Active research\OpenSearch\capture_explorer_proof.ps1
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\capture_explorer_proof.ps1
+     Source Size   : 845 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 23:28:50
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[4] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : cap.ps1
+     Relative Path : cap.ps1
+     Source Path   : D:\Active research\OpenSearch\cap.ps1
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\cap.ps1
+     Source Size   : 2,286 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 23:33:47
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[5] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : capture_explorer_proof.py
+     Relative Path : capture_explorer_proof.py
+     Source Path   : D:\Active research\OpenSearch\capture_explorer_proof.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\capture_explorer_proof.py
+     Source Size   : 654 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 23:28:37
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[6] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : capture_gui_explorer.py
+     Relative Path : capture_gui_explorer.py
+     Source Path   : D:\Active research\OpenSearch\capture_gui_explorer.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\capture_gui_explorer.py
+     Source Size   : 2,377 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 23:33:29
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[7] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : check_visible_windows.py
+     Relative Path : check_visible_windows.py
+     Source Path   : D:\Active research\OpenSearch\check_visible_windows.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\check_visible_windows.py
+     Source Size   : 1,291 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 23:23:29
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[8] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : docx_thumb_test.jpg
+     Relative Path : docx_thumb_test.jpg
+     Source Path   : D:\Active research\OpenSearch\docx_thumb_test.jpg
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\docx_thumb_test.jpg
+     Source Size   : 549,366 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 23:50:11
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[9] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : docker-compose.yml
+     Relative Path : docker-compose.yml
+     Source Path   : D:\Active research\OpenSearch\docker-compose.yml
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\docker-compose.yml
+     Source Size   : 1,109 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-08-11 15:31:46
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[10] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : generate_sync_audit_report.py
+     Relative Path : generate_sync_audit_report.py
+     Source Path   : D:\Active research\OpenSearch\generate_sync_audit_report.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\generate_sync_audit_report.py
+     Source Size   : 8,259 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 19:44:48
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[11] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : indexer_config.json
+     Relative Path : indexer_config.json
+     Source Path   : D:\Active research\OpenSearch\indexer_config.json
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\indexer_config.json
+     Source Size   : 516 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 20:06:34
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[12] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : indexer_progress.json
+     Relative Path : indexer_progress.json
+     Source Path   : D:\Active research\OpenSearch\indexer_progress.json
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\indexer_progress.json
+     Source Size   : 1,384 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 20:07:54
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[13] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : index_settings.json
+     Relative Path : index_settings.json
+     Source Path   : D:\Active research\OpenSearch\index_settings.json
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\index_settings.json
+     Source Size   : 938 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 20:53:40
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[14] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Launch_OpenSearch.bat
+     Relative Path : Launch_OpenSearch.bat
+     Source Path   : D:\Active research\OpenSearch\Launch_OpenSearch.bat
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\Launch_OpenSearch.bat
+     Source Size   : 1,140 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-03 17:24:46
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[15] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : ingest_documents.py
+     Relative Path : ingest_documents.py
+     Source Path   : D:\Active research\OpenSearch\ingest_documents.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\ingest_documents.py
+     Source Size   : 66,287 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 20:05:17
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[16] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : LICENSE
+     Relative Path : LICENSE
+     Source Path   : D:\Active research\OpenSearch\LICENSE
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\LICENSE
+     Source Size   : 2,814 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 22:25:50
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[17] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : monitor_robocopy.py
+     Relative Path : monitor_robocopy.py
+     Source Path   : D:\Active research\OpenSearch\monitor_robocopy.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\monitor_robocopy.py
+     Source Size   : 7,307 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 18:55:17
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[18] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : OpenSearch.lnk
+     Relative Path : OpenSearch.lnk
+     Source Path   : D:\Active research\OpenSearch\OpenSearch.lnk
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\OpenSearch.lnk
+     Source Size   : 960 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 22:16:23
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[19] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : pregenerate_thumbnails.py
+     Relative Path : pregenerate_thumbnails.py
+     Source Path   : D:\Active research\OpenSearch\pregenerate_thumbnails.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\pregenerate_thumbnails.py
+     Source Size   : 20,314 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-08-10 11:55:41
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[20] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : protocol_handler.py
+     Relative Path : protocol_handler.py
+     Source Path   : D:\Active research\OpenSearch\protocol_handler.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\protocol_handler.py
+     Source Size   : 2,617 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-08-11 21:42:42
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[21] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : README.md
+     Relative Path : README.md
+     Source Path   : D:\Active research\OpenSearch\README.md
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\README.md
+     Source Size   : 3,456 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 22:25:41
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[22] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : register_protocol.py
+     Relative Path : register_protocol.py
+     Source Path   : D:\Active research\OpenSearch\register_protocol.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\register_protocol.py
+     Source Size   : 1,149 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 23:26:15
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[23] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : requirements.txt
+     Relative Path : requirements.txt
+     Source Path   : D:\Active research\OpenSearch\requirements.txt
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\requirements.txt
+     Source Size   : 96 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-03 17:31:07
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[24] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Restart_X1.lnk
+     Relative Path : Restart_X1.lnk
+     Source Path   : D:\Active research\OpenSearch\Restart_X1.lnk
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\Restart_X1.lnk
+     Source Size   : 1,690 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-08-01 16:45:02
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[25] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Restart_X1.cmd
+     Relative Path : Restart_X1.cmd
+     Source Path   : D:\Active research\OpenSearch\Restart_X1.cmd
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\Restart_X1.cmd
+     Source Size   : 168 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-08-01 16:45:01
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[26] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : check_synced_time_diff.py
+     Relative Path : scratch\check_synced_time_diff.py
+     Source Path   : D:\Active research\OpenSearch\scratch\check_synced_time_diff.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\scratch\check_synced_time_diff.py
+     Source Size   : 3,385 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 19:17:40
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[27] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : fast_mtime_compare.py
+     Relative Path : scratch\fast_mtime_compare.py
+     Source Path   : D:\Active research\OpenSearch\scratch\fast_mtime_compare.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\scratch\fast_mtime_compare.py
+     Source Size   : 2,975 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 19:18:29
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[28] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : compare_51_files.py
+     Relative Path : scratch\compare_51_files.py
+     Source Path   : D:\Active research\OpenSearch\scratch\compare_51_files.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\scratch\compare_51_files.py
+     Source Size   : 2,734 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 19:18:13
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[29] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : find_recent_mtime_diff.py
+     Relative Path : scratch\find_recent_mtime_diff.py
+     Source Path   : D:\Active research\OpenSearch\scratch\find_recent_mtime_diff.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\scratch\find_recent_mtime_diff.py
+     Source Size   : 2,244 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 19:17:57
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[30] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : get_index_stats.py
+     Relative Path : scratch\get_index_stats.py
+     Source Path   : D:\Active research\OpenSearch\scratch\get_index_stats.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\scratch\get_index_stats.py
+     Source Size   : 1,765 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 19:09:09
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[31] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : scan_backups_diff.py
+     Relative Path : scratch\scan_backups_diff.py
+     Source Path   : D:\Active research\OpenSearch\scratch\scan_backups_diff.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\scratch\scan_backups_diff.py
+     Source Size   : 2,614 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 19:18:41
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[32] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : search_app.py
+     Relative Path : search_app.py
+     Source Path   : D:\Active research\OpenSearch\search_app.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\search_app.py
+     Source Size   : 88,046 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 19:01:49
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[33] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : start_opensearch.ps1
+     Relative Path : start_opensearch.ps1
+     Source Path   : D:\Active research\OpenSearch\start_opensearch.ps1
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\start_opensearch.ps1
+     Source Size   : 976 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 20:54:06
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[34] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : stop_opensearch.ps1
+     Relative Path : stop_opensearch.ps1
+     Source Path   : D:\Active research\OpenSearch\stop_opensearch.ps1
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\stop_opensearch.ps1
+     Source Size   : 289 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 20:54:13
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[35] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : sync_audit_report.txt
+     Relative Path : sync_audit_report.txt
+     Source Path   : D:\Active research\OpenSearch\sync_audit_report.txt
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\sync_audit_report.txt
+     Source Size   : 11,788 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 19:59:58
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[36] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : test_exact.jpg
+     Relative Path : test_exact.jpg
+     Source Path   : D:\Active research\OpenSearch\test_exact.jpg
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\test_exact.jpg
+     Source Size   : 119,660 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-30 00:52:03
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[37] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : test_opus.py
+     Relative Path : test_opus.py
+     Source Path   : D:\Active research\OpenSearch\test_opus.py
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\test_opus.py
+     Source Size   : 1,223 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 23:10:09
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[38] SYNC EVENT: SAN Sync: OpenSearch -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : test_thumb.jpg
+     Relative Path : test_thumb.jpg
+     Source Path   : D:\Active research\OpenSearch\test_thumb.jpg
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Active research\OpenSearch\test_thumb.jpg
+     Source Size   : 583,749 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-07-29 23:38:00
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------

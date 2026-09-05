@@ -1044,28 +1044,45 @@ def build_san_summary_dict(network_target: str = r"\\Synology_NAS\Videos and pic
 
 def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copied: int = 0, base_skipped: int = 0, san_summary: dict = None):
     """
-    Runs Robocopy in ultra-fast mode (/NFL /NDL) so pipe stdout I/O never slows down SMB transfers.
-    Parses live progress and final job summary for accurate instant status updates.
+    Runs Robocopy with /V /NP /NJH and parses live stdout streaming for dynamic progress updates.
     """
     import re
-    # Filter out output-suppression flags so we can get summary, but use /NFL /NDL for max speed
+    # Remove flags that suppress stdout file output or summary
     cmd_filtered = [arg for arg in cmd if arg not in ["/NFL", "/NDL", "/NJH", "/NJS", "/NC", "/NS", "/NP", "/V"]]
-    cmd_filtered.extend(["/NFL", "/NDL", "/NP"])
+    cmd_filtered.extend(["/V", "/NP", "/NJH"])
     
     copied_count = 0
     skipped_count = 0
     
-    # Emit progress immediately at start
-    if base_copied == 0 and base_skipped == 0:
-        msg = f"⚡ Phase 3/3 (Scanning NAS directory structure...): {label}"
-    else:
-        msg = f"⚡ Phase 3/3 ({base_copied:,} synced, {base_skipped:,} skipped): {label}"
-    write_progress(True, base_copied + base_skipped, base_copied, base_skipped, msg, san_summary=san_summary)
-
+    last_update_t = 0.0
+    stdout_lines = []
+    
     try:
         proc = subprocess.Popen(cmd_filtered, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, errors='replace')
-        stdout_data, _ = proc.communicate()
+        
+        for line in iter(proc.stdout.readline, ''):
+            stdout_lines.append(line)
+            l = line.strip()
+            if not l:
+                continue
+            
+            low = l.lower()
+            if "same" in low:
+                skipped_count += 1
+            elif any(k in low for k in ["new file", "newer", "older", "modified", "*extra"]):
+                copied_count += 1
+            
+            now = time.time()
+            if now - last_update_t >= 0.3:
+                total_c = base_copied + copied_count
+                total_s = base_skipped + skipped_count
+                msg = f"⚡ Phase 3/3 ({total_c:,} synced, {total_s:,} checked): {label}"
+                write_progress(True, total_c + total_s, total_c, total_s, msg, san_summary=san_summary)
+                last_update_t = now
+                
+        proc.wait()
         returncode = proc.returncode
+        stdout_data = "".join(stdout_lines)
     except Exception as e:
         print(f"[-] Failed to launch Robocopy: {e}")
         return 16, 0, 0
@@ -1081,7 +1098,7 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
     
     total_c = base_copied + copied_count
     total_s = base_skipped + skipped_count
-    final_msg = f"⚡ Phase 3/3 ({total_c:,} synced, {total_s:,} skipped): {label} complete"
+    final_msg = f"⚡ Phase 3/3 ({total_c:,} synced, {total_s:,} checked): {label} complete"
     write_progress(True, total_c + total_s, total_c, total_s, final_msg, san_summary=san_summary)
     return returncode, copied_count, skipped_count
 
@@ -1116,7 +1133,10 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         # Audit NAS sync candidates to sync_audit_report.txt before starting transfers
         try:
             from generate_sync_audit_report import generate_full_audit_report
-            generate_full_audit_report()
+            def audit_progress(checked, total, drift_count):
+                msg = f"⚡ Phase 3/3 Audit ({checked:,}/{total:,} checked, {drift_count:,} drift/missing): Scanning NAS..."
+                write_progress(True, checked, 0, drift_count, msg, san_summary=san_summary)
+            generate_full_audit_report(progress_callback=audit_progress)
         except Exception as e_audit:
             print(f"[-] Audit log error: {e_audit}")
 
@@ -1524,7 +1544,7 @@ def main():
             
             if net_target:
                 san_sum = build_san_summary_dict(net_target)
-                write_progress(True, total_scanned, total_indexed, total_skipped, f"⚡ Phase 3/3 (Scanning NAS directory structure...): Syncing backups to network target '{net_target}'...", san_summary=san_sum)
+                write_progress(True, total_scanned, total_indexed, total_skipped, f"⚡ Phase 3/3 Audit: Initializing NAS sync scan to '{net_target}'...", san_summary=san_sum)
                 sync_to_network_target(backup_dir, net_target)
         
         final_msg = f"✅ All Phases Complete ({total_scanned:,} docs checked, backups synced)!"
