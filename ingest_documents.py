@@ -1042,7 +1042,7 @@ def build_san_summary_dict(network_target: str = r"\\Synology_NAS\Videos and pic
     return san_summary
 
 
-def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copied: int = 0, base_skipped: int = 0, san_summary: dict = None):
+def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copied: int = 0, base_skipped: int = 0, san_summary: dict = None, phase_prefix: str = "⚡ Phase 3/3"):
     """
     Runs Robocopy with /V /NP /NJH and parses live stdout streaming for dynamic progress updates.
     """
@@ -1067,9 +1067,9 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
                 continue
             
             low = l.lower()
-            if " dir" in low or low.endswith("\\") or low.endswith("/") or "fix " in low:
-                continue  # Skip directory headers and timestamp fixes so only file operations are counted
-            if "same" in low:
+            if " dir" in low or low.endswith("\\") or low.endswith("/"):
+                continue  # Skip directory headers so only file operations are counted
+            if "same" in low or "fix " in low:
                 skipped_count += 1
             elif any(k in low for k in ["new file", "newer", "older"]) or ("modified" in low and "fix" not in low):
                 copied_count += 1
@@ -1079,7 +1079,7 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
                 total_c = base_copied + copied_count
                 total_s = base_skipped + skipped_count
                 total_chk = total_c + total_s
-                msg = f"⚡ Phase 3/3 ({total_c:,} synced, {total_s:,} skipped / {total_chk:,} checked): {label}"
+                msg = f"{phase_prefix} ({total_c:,} synced, {total_s:,} skipped / {total_chk:,} checked): {label}"
                 write_progress(True, total_chk, total_c, total_s, msg, san_summary=san_summary)
                 last_update_t = now
                 
@@ -1093,7 +1093,7 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
     total_c = base_copied + copied_count
     total_s = base_skipped + skipped_count
     total_chk = total_c + total_s
-    final_msg = f"⚡ Phase 3/3 ({total_c:,} synced, {total_s:,} skipped / {total_chk:,} checked): {label} complete"
+    final_msg = f"{phase_prefix} ({total_c:,} synced, {total_s:,} skipped / {total_chk:,} checked): {label} complete"
     write_progress(True, total_c + total_s, total_c, total_s, final_msg, san_summary=san_summary)
     return returncode, copied_count, skipped_count
 
