@@ -1113,6 +1113,13 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
     try:
         os.makedirs(network_target, exist_ok=True)
 
+        # Audit NAS sync candidates to sync_audit_report.txt before starting transfers
+        try:
+            from generate_sync_audit_report import generate_full_audit_report
+            generate_full_audit_report()
+        except Exception as e_audit:
+            print(f"[-] Audit log error: {e_audit}")
+
         # 1. Direct SAN Sync for D:\Backups
         local_backups_root = os.path.dirname(backup_dir) if backup_dir.lower().endswith(r"\documents") else backup_dir
         if sys.platform == 'win32':

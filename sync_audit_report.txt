@@ -131,3 +131,14 @@
      Target mtime  : N/A
      Time Delta    : N/A
 ----------------------------------------------------------------------------------------
+[2026-09-04 19:59:58] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : test_sync_log_demo.txt
+     Source Path   : D:\Dropbox\test_sync_log_demo.txt
+     Target Path   : D:\Backups\Documents\Dropbox\test_sync_log_demo.txt
+     Source Size   : 58 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-04 19:59:58
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
