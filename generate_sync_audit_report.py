@@ -88,8 +88,9 @@ def check_file_pair(item):
 def collect_fast_pairs(label, src_dir, dst_dir, max_files=None, progress_callback=None, initial_count=0):
     if not os.path.exists(src_dir):
         return []
-    exclude_names = {'__pycache__', '.git', 'node_modules', '.venv', 'venv', '.cache', '.cache_thumbnails', 'appdata', 'identified'}
+    exclude_names = {'__pycache__', '.git', 'node_modules', '.venv', 'venv', '.cache', '.cache_thumbnails', 'appdata', 'identified', 'scratch', 'temp'}
     exclude_exts = {'.csv', '.pyc', '.tmp', '.log', '.dat', '.cache'}
+    exclude_filenames = {'indexer_config.json', 'indexer_progress.json', 'sync_progress.json', 'robocopy_monitor.log', 'sync_audit_report.txt'}
 
     pairs = []
     stack = [(src_dir, dst_dir, "")]
@@ -108,7 +109,7 @@ def collect_fast_pairs(label, src_dir, dst_dir, max_files=None, progress_callbac
                 rel_path = os.path.join(rel_curr, entry.name) if rel_curr else entry.name
                 if entry.is_file(follow_symlinks=False):
                     ext = os.path.splitext(entry.name)[1].lower()
-                    if ext in exclude_exts:
+                    if ext in exclude_exts or entry.name.lower() in exclude_filenames:
                         continue
                     pairs.append((label, entry.path, os.path.join(dst_dir, rel_path), rel_path))
                     now = time.time()
