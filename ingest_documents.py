@@ -1090,15 +1090,6 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
         print(f"[-] Failed to launch Robocopy: {e}")
         return 16, 0, 0
 
-    # Parse authoritative Job Summary table from Robocopy stdout
-    m = re.search(r'Files\s*:\s*([\d,]+)\s+([\d,]+)\s+([\d,]+)', stdout_data, re.IGNORECASE)
-    if m:
-        try:
-            copied_count = int(m.group(2).replace(',', ''))
-            skipped_count = int(m.group(3).replace(',', ''))
-        except ValueError:
-            pass
-    
     total_c = base_copied + copied_count
     total_s = base_skipped + skipped_count
     total_chk = total_c + total_s
