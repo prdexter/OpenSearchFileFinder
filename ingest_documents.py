@@ -1067,9 +1067,11 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
                 continue
             
             low = l.lower()
+            if " dir" in low or low.endswith("\\") or low.endswith("/"):
+                continue  # Skip directory headers so only file operations are counted
             if "same" in low:
                 skipped_count += 1
-            elif any(k in low for k in ["new file", "newer", "older", "modified", "*extra"]):
+            elif any(k in low for k in ["new file", "newer", "older", "modified", "*extra file", "*extra"]):
                 copied_count += 1
             
             now = time.time()
