@@ -1694,7 +1694,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
 
         # Render Main Search HTML
         query_str = params.get('q', [''])[0].strip()
-        sort_by = params.get('sort', ['relevance'])[0].strip()
+        sort_by = params.get('sort', ['date_desc'])[0].strip()
         
         try:
             page = int(params.get('page', ['1'])[0])

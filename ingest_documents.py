@@ -690,7 +690,9 @@ def fetch_existing_metadata(client, index_name="documents"):
             fp = src.get('file_path')
             if fp:
                 norm = os.path.normpath(os.path.abspath(fp)).lower()
-                existing_map[norm] = (src.get('modified_date'), src.get('file_size'))
+                # Store actual _id from index so cleanup can delete by the real ID,
+                # not a recomputed hash that may differ if the hashing scheme changed.
+                existing_map[norm] = (src.get('modified_date'), src.get('file_size'), doc.get('_id'))
             if count % 2000 == 0 or count == total_docs:
                 pct_str = f" ({int(count / total_docs * 100)}%)" if total_docs > 0 else ""
                 write_progress(True, 0, 0, 0, f"⚡ Pre-fetching database metadata: {count:,} / {total_str} loaded{pct_str}... (takes ~15-30s)")
@@ -823,7 +825,7 @@ def process_single_file(file_path: str, index_name: str, existing_map: dict = No
 
         # Fast Delta Skip Check: Compare file mtime and file size with 3-second tolerance
         if not force and existing_map and norm_path in existing_map:
-            cached_mtime, cached_size = existing_map[norm_path]
+            cached_mtime, cached_size = existing_map[norm_path][0], existing_map[norm_path][1]
             if cached_size == file_size:
                 if cached_mtime == mtime_iso:
                     return None, 'skipped'
@@ -1516,7 +1518,12 @@ def main():
                 for fp in dead_paths:
                     try:
                         # 1. Remove from OpenSearch Index
-                        doc_id = hashlib.sha256(fp.encode('utf-8')).hexdigest()
+                        # Use the actual _id stored during metadata fetch — do NOT recompute
+                        # the hash, as older docs may have been indexed with a different
+                        # casing scheme (mixed-case path vs. lowercased), producing a
+                        # different SHA-256 and a silent 404 on delete.
+                        stored_entry = existing_map.get(fp, (None, None, None))
+                        doc_id = stored_entry[2] if len(stored_entry) > 2 and stored_entry[2] else hashlib.sha256(fp.encode('utf-8')).hexdigest()
                         client.delete(index=args.index, id=doc_id, ignore=[404])
                         total_deleted += 1
 

@@ -5491,3 +5491,1741 @@
      Target mtime  : 2026-09-04 21:53:09
      Time Delta    : 524.88s
 ----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-04 22:15:09
+ Audit Execution Time      : 137.26 seconds
+ Candidate Files Inspected : 127,519
+ Total Files Requiring Sync: 0
+========================================================================================
+
+✅ NO FILES REQUIRE SYNC (All local backup files and Synology NAS copies are 100% up to date and in parity).
+[2026-09-16 11:40:58] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 20260831-statements-2593-.pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\20260831-statements-2593-.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\20260831-statements-2593-.pdf
+     Source Size   : 90,235 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 12:31:15
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:58] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Invitae lab tests 2019-2025.xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\Invitae lab tests 2019-2025.xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\Invitae lab tests 2019-2025.xlsx
+     Source Size   : 902,580 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 15:36:37
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:58] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Jorgensen-2026-A-multilevel-intervention-to-identi.pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\Jorgensen-2026-A-multilevel-intervention-to-identi.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\Jorgensen-2026-A-multilevel-intervention-to-identi.pdf
+     Source Size   : 1,274,955 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 13:30:59
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:58] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : William_Wright_LOR_suggested_edits_highlighted.docx
+     Source Path   : C:\Users\Paul Dexter\Downloads\William_Wright_LOR_suggested_edits_highlighted.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\William_Wright_LOR_suggested_edits_highlighted.docx
+     Source Size   : 37,921 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 21:19:59
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:58] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Indiana U_July 2026 Pull_Clean.xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\OneDrive_1_9-5-2026\Indiana U_July 2026 Pull_Clean.xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\OneDrive_1_9-5-2026\Indiana U_July 2026 Pull_Clean.xlsx
+     Source Size   : 20,549 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 15:45:48
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:58] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Indiana U_initial pull_Clean ver (7 addl orgs 6.25.26).xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\OneDrive_1_9-5-2026\Indiana U_initial pull_Clean ver (7 addl orgs 6.25.26).xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\OneDrive_1_9-5-2026\Indiana U_initial pull_Clean ver (7 addl orgs 6.25.26).xlsx
+     Source Size   : 131,474 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 15:45:48
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:58] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Indiana U_Aug 2026 Pull_Clean.xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\OneDrive_1_9-5-2026\Indiana U_Aug 2026 Pull_Clean.xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\OneDrive_1_9-5-2026\Indiana U_Aug 2026 Pull_Clean.xlsx
+     Source Size   : 19,668 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 15:45:48
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:58] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Indiana U_initial pull_Clean ver (addl cases).xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\OneDrive_1_9-5-2026\Indiana U_initial pull_Clean ver (addl cases).xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\OneDrive_1_9-5-2026\Indiana U_initial pull_Clean ver (addl cases).xlsx
+     Source Size   : 81,729 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 15:45:48
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:59] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : IU-Annual-Evaluation-Mentor-Evaluating-Mentee.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\IU-Annual-Evaluation-Mentor-Evaluating-Mentee.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\IU-Annual-Evaluation-Mentor-Evaluating-Mentee.docx
+     Source Size   : 33,663 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-07 12:56:52
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:59] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Aarthi_Anecdote.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\1_Aarthi_Anecdote.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\1_Aarthi_Anecdote.docx
+     Source Size   : 14,611 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:18:05
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:59] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Aarthi_CV_2026.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\1_Aarthi_CV_2026.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\1_Aarthi_CV_2026.docx
+     Source Size   : 19,969 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:15:25
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:59] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Aarthi_ERAS_LoR.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\1_Aarthi_ERAS_LoR.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\1_Aarthi_ERAS_LoR.pdf
+     Source Size   : 30,710 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:17:23
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:59] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Aarthi Chockalingam letter of recommendation.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi Chockalingam letter of recommendation.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi Chockalingam letter of recommendation.docx
+     Source Size   : 28,493 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 20:31:25
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:59] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Aarthi_My_notes_from_meeting .docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\1_Aarthi_My_notes_from_meeting .docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\1_Aarthi_My_notes_from_meeting .docx
+     Source Size   : 1,671,116 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:09:47
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:59] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Aarthi_Personal_Statement.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\1_Aarthi_Personal_Statement.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\1_Aarthi_Personal_Statement.docx
+     Source Size   : 8,254 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:19:36
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:40:59] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Aarthi_Additional_statements.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi_Additional_statements.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi_Additional_statements.docx
+     Source Size   : 27,462 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 20:19:40
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:00] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Email to Aarthi.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Email to Aarthi.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Email to Aarthi.docx
+     Source Size   : 13,382 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:37:00
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:00] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Sai_CV_2026.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\1_Sai_CV_2026.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\1_Sai_CV_2026.docx
+     Source Size   : 28,294 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-08-09 11:28:47
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:01] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Sai_My notes from_meeting .docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\1_Sai_My notes from_meeting .docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\1_Sai_My notes from_meeting .docx
+     Source Size   : 15,474 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:12:15
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:02] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Sai_Personal_Statement.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\1_Sai_Personal_Statement.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\1_Sai_Personal_Statement.docx
+     Source Size   : 16,857 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-08-09 11:28:47
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:03] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 2_Sai_Anecdote.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\2_Sai_Anecdote.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\2_Sai_Anecdote.docx
+     Source Size   : 13,534 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:17:16
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:03] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 2_Sai_ERAS_LoR_Pending.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\2_Sai_ERAS_LoR_Pending.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\2_Sai_ERAS_LoR_Pending.docx
+     Source Size   : 1,670,519 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:16:40
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:04] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Email to Sai.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Email to Sai.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Email to Sai.docx
+     Source Size   : 13,773 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 20:54:13
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:05] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Sai Chalasani letter of recommendation.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Sai Chalasani letter of recommendation.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Sai Chalasani letter of recommendation.docx
+     Source Size   : 28,581 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 21:14:39
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:06] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Sai_Additional_statements.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Sai_Additional_statements.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Sai_Additional_statements.docx
+     Source Size   : 40,776 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:49:03
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Wright_CV_2026.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\1_Wright_CV_2026.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\1_Wright_CV_2026.docx
+     Source Size   : 44,261 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-01 06:05:20
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:08] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Wright_ERAS_LoR.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\1_Wright_ERAS_LoR.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\1_Wright_ERAS_LoR.docx
+     Source Size   : 18,174 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:42:35
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:09] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Wright_Personal_Statement for Anesthesia.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\1_Wright_Personal_Statement for Anesthesia.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\1_Wright_Personal_Statement for Anesthesia.docx
+     Source Size   : 16,273 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-01 06:05:20
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:10] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 2_Wright_Anecdote.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\2_Wright_Anecdote.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\2_Wright_Anecdote.docx
+     Source Size   : 13,534 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:17:16
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:10] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 2_Wright_My_notes_from_meeting.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\2_Wright_My_notes_from_meeting.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\2_Wright_My_notes_from_meeting.docx
+     Source Size   : 14,649 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:26:30
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:10] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Email to Wright.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\Email to Wright.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\Email to Wright.docx
+     Source Size   : 13,384 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:37:50
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:10] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : William Wright letter of recommendation.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\William Wright letter of recommendation.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\William Wright letter of recommendation.docx
+     Source Size   : 27,736 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-07 11:16:49
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:12] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : William_Wright_Additional_statements.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\William_Wright_Additional_statements.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\William_Wright_Additional_statements.docx
+     Source Size   : 40,526 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:50:15
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:13] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Wright_Additional_statements.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\Wright_Additional_statements.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\Wright_Additional_statements.docx
+     Source Size   : 40,526 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:50:21
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:14] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Zoha_CV_2026.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\1_Zoha_CV_2026.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\1_Zoha_CV_2026.docx
+     Source Size   : 3,792,379 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:26:22
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:15] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 2_Zoha_Anecdote.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\2_Zoha_Anecdote.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\2_Zoha_Anecdote.docx
+     Source Size   : 13,534 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:17:16
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:15] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 2_Zoha_ERAS_LoR_Pending.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\2_Zoha_ERAS_LoR_Pending.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\2_Zoha_ERAS_LoR_Pending.docx
+     Source Size   : 1,670,519 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:16:40
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:16] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 2_Zoha_My notes from_meeting .docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\2_Zoha_My notes from_meeting .docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\2_Zoha_My notes from_meeting .docx
+     Source Size   : 14,675 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:35:10
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:16] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 2_Zoha_Personal_Statement.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\2_Zoha_Personal_Statement.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\2_Zoha_Personal_Statement.docx
+     Source Size   : 14,655 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:35:26
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:16] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Email to Zoha.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\Email to Zoha.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\Email to Zoha.docx
+     Source Size   : 14,464 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:07:17
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:17] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Zoha Khan letter of recommendation.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\Zoha Khan letter of recommendation.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\Zoha Khan letter of recommendation.docx
+     Source Size   : 37,513 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-03 20:53:21
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Zoha_Additional_statements.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\Zoha_Additional_statements.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\Zoha_Additional_statements.docx
+     Source Size   : 40,728 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 19:53:30
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:20] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Aarthi Chockalingam letter of recommendation.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Aarthi Chockalingam letter of recommendation.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Aarthi Chockalingam letter of recommendation.docx
+     Source Size   : 37,904 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-03 21:13:39
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:21] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Sai Chalasani letter of recommendation.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Sai Chalasani letter of recommendation.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Sai Chalasani letter of recommendation.docx
+     Source Size   : 37,558 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-03 20:43:16
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:22] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : William Wright letter of recommendation.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\William Wright letter of recommendation.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\William Wright letter of recommendation.docx
+     Source Size   : 37,493 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-03 20:49:10
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:22] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Zoha Khan letter of recommendation.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Zoha Khan letter of recommendation.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Zoha Khan letter of recommendation.docx
+     Source Size   : 37,513 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-03 20:53:21
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:23] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : CV_AC.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Aarthi Chockalingam\CV_AC.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Aarthi Chockalingam\CV_AC.docx
+     Source Size   : 19,969 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:15:25
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:24] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : IM Wards Anecdote.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Aarthi Chockalingam\IM Wards Anecdote.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Aarthi Chockalingam\IM Wards Anecdote.docx
+     Source Size   : 14,611 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:18:05
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:25] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : LoR Request PD.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Aarthi Chockalingam\LoR Request PD.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Aarthi Chockalingam\LoR Request PD.pdf
+     Source Size   : 30,710 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:17:23
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:25] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Presonal Statement Draft #1.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Aarthi Chockalingam\Presonal Statement Draft #1.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Aarthi Chockalingam\Presonal Statement Draft #1.docx
+     Source Size   : 8,254 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:19:36
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:26] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : personal statement draft 1.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Sai Chalasani\personal statement draft 1.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Sai Chalasani\personal statement draft 1.docx
+     Source Size   : 16,857 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-08-09 11:28:47
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:27] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Sai Chalasani CV 2026.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Sai Chalasani\Sai Chalasani CV 2026.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Sai Chalasani\Sai Chalasani CV 2026.docx
+     Source Size   : 28,294 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-08-09 11:28:47
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:28] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Final Personal Statement for Ansethesia shorten version.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\William Wright\Final Personal Statement for Ansethesia shorten version.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\William Wright\Final Personal Statement for Ansethesia shorten version.docx
+     Source Size   : 16,273 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-01 06:05:20
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:29] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : William Wright CV Final.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\William Wright\William Wright CV Final.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\William Wright\William Wright CV Final.docx
+     Source Size   : 44,261 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-01 06:05:20
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:30] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Wright ERAS LoR.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\William Wright\Wright ERAS LoR.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\William Wright\Wright ERAS LoR.docx
+     Source Size   : 18,174 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:42:35
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:31] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Updated CV (1).docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Zoha Khan\Updated CV (1).docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\2026 letters\Zoha Khan\Updated CV (1).docx
+     Source Size   : 3,792,379 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-06 18:26:22
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-16 11:41:36] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 13,675,592 bytes | Target: 13,674,464 bytes)
+     File Name     : Immediate to do list.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\To do lists\Immediate to do list.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\To do lists\Immediate to do list.docx
+     Source Size   : 13,675,592 bytes
+     Target Size   : 13,674,464 bytes
+     Source mtime  : 2026-09-15 13:49:07
+     Target mtime  : 2026-09-03 15:29:26
+     Time Delta    : 1030780.54s
+----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-16 11:46:06
+ Audit Execution Time      : 177.86 seconds
+ Candidate Files Inspected : 127,577
+ Total Files Requiring Sync: 4
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : TIMESTAMP_DRIFT (Delta: 100081.84s > 3.0s threshold)
+     File Name     : Pdexter's Quicken Data.QDF
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Size   : 193,306,624 bytes
+     Target Size   : 193,306,624 bytes
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : 2026-09-04 10:40:51
+     Time Delta    : 100081.84s
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: Quicken -> NAS
+     Prompt Reason : TIMESTAMP_DRIFT (Delta: 100081.84s > 3.0s threshold)
+     File Name     : Pdexter's Quicken Data.QDF
+     Relative Path : Pdexter's Quicken Data.QDF
+     Source Path   : \\?\C:\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Target Path   : \\Synology_NAS\Videos and pics\Quicken\Pdexter's Quicken Data.QDF
+     Source Size   : 193,306,624 bytes
+     Target Size   : 193,306,624 bytes
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : 2026-09-04 10:40:51
+     Time Delta    : 100081.84s
+----------------------------------------------------------------------------------------
+[4] SYNC EVENT: SAN Sync: Quicken -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Relative Path : BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Path   : \\?\C:\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:05] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 322269256_UsageDetails.xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\322269256_UsageDetails.xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\322269256_UsageDetails.xlsx
+     Source Size   : 17,608 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-22 12:15:37
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:05] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : cv-3249141 (1).pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\cv-3249141 (1).pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\cv-3249141 (1).pdf
+     Source Size   : 58,937 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-21 18:59:00
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:05] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : cv-3249141.pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\cv-3249141.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\cv-3249141.pdf
+     Source Size   : 58,936 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-21 18:50:56
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:05] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 4326100000_432900361501_20260810.pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\4326100000_432900361501_20260810.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\4326100000_432900361501_20260810.pdf
+     Source Size   : 2,067,036 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-22 14:15:23
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:05] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 4326100000_432342139101_20260910.pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\4326100000_432342139101_20260910.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\4326100000_432342139101_20260910.pdf
+     Source Size   : 2,066,973 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-22 14:14:21
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:05] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 4326100000_432207681976_20241010.pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\4326100000_432207681976_20241010.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\4326100000_432207681976_20241010.pdf
+     Source Size   : 2,066,826 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-22 14:15:06
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:06] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Dexter biosketch.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Dexter biosketch.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Dexter biosketch.pdf
+     Source Size   : 58,936 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-21 18:52:43
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:06] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Dexter_biosketch.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Dexter_biosketch.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Dexter_biosketch.docx
+     Source Size   : 35,820 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-21 17:27:50
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : registry_errors.txt
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_errors.txt
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_errors.txt
+     Source Size   : 10 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-17 23:19:11
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : PI_names.txt
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\PI_names.txt
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\PI_names.txt
+     Source Size   : 70,415 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-17 20:54:00
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : registry_hits_full.txt
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_hits_full.txt
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_hits_full.txt
+     Source Size   : 233,049 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-17 23:18:55
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : registry_hits_IU_confirmed.txt
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_hits_IU_confirmed.txt
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_hits_IU_confirmed.txt
+     Source Size   : 70,027 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-18 00:57:12
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : registry_hits_full_IU_filtered.txt
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_hits_full_IU_filtered.txt
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_hits_full_IU_filtered.txt
+     Source Size   : 94,498 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-18 00:34:57
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : registry_hits_IU_confirmed_typed.txt
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_hits_IU_confirmed_typed.txt
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_hits_IU_confirmed_typed.txt
+     Source Size   : 86,445 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-18 01:07:13
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : registry_hits_full_IU_filter_audit.txt
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_hits_full_IU_filter_audit.txt
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\registry_hits_full_IU_filter_audit.txt
+     Source Size   : 423,268 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-18 00:34:57
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : tuples.txt
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\tuples.txt
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\tuples.txt
+     Source Size   : 860,007 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-17 20:51:21
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Aarthi Chockalingam letter of recommendation.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi Chockalingam letter of recommendation.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi Chockalingam letter of recommendation.pdf
+     Source Size   : 103,893 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-16 14:29:04
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 23,142 bytes | Target: 28,493 bytes)
+     File Name     : Aarthi Chockalingam letter of recommendation.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi Chockalingam letter of recommendation.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi Chockalingam letter of recommendation.docx
+     Source Size   : 23,142 bytes
+     Target Size   : 28,493 bytes
+     Source mtime  : 2026-09-16 14:20:59
+     Target mtime  : 2026-09-06 20:31:25
+     Time Delta    : 841773.37s
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Aarthi Chockalingam letter of recommendation2.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi Chockalingam letter of recommendation2.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi Chockalingam letter of recommendation2.docx
+     Source Size   : 28,728 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-16 13:48:26
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 16,747 bytes | Target: 16,857 bytes)
+     File Name     : 1_Sai_Personal_Statement.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\1_Sai_Personal_Statement.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\1_Sai_Personal_Statement.docx
+     Source Size   : 16,747 bytes
+     Target Size   : 16,857 bytes
+     Source mtime  : 2026-09-16 14:41:47
+     Target mtime  : 2026-08-09 11:28:47
+     Time Delta    : 3294779.04s
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 14,197 bytes | Target: 13,534 bytes)
+     File Name     : 2_Sai_Anecdote.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\2_Sai_Anecdote.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\2_Sai_Anecdote.docx
+     Source Size   : 14,197 bytes
+     Target Size   : 13,534 bytes
+     Source mtime  : 2026-09-16 14:40:42
+     Target mtime  : 2026-09-06 19:17:16
+     Time Delta    : 847405.09s
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 28,740 bytes | Target: 28,294 bytes)
+     File Name     : 1_Sai_CV_2026.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\1_Sai_CV_2026.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\1_Sai_CV_2026.docx
+     Source Size   : 28,740 bytes
+     Target Size   : 28,294 bytes
+     Source mtime  : 2026-09-16 14:39:43
+     Target mtime  : 2026-08-09 11:28:47
+     Time Delta    : 3294655.10s
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 14,601 bytes | Target: 13,773 bytes)
+     File Name     : Email to Sai.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Email to Sai.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Email to Sai.docx
+     Source Size   : 14,601 bytes
+     Target Size   : 13,773 bytes
+     Source mtime  : 2026-09-16 14:40:28
+     Target mtime  : 2026-09-06 20:54:13
+     Time Delta    : 841574.32s
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 29,109 bytes | Target: 28,581 bytes)
+     File Name     : Sai Chalasani letter of recommendation.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Sai Chalasani letter of recommendation.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Sai Chalasani letter of recommendation.docx
+     Source Size   : 29,109 bytes
+     Target Size   : 28,581 bytes
+     Source mtime  : 2026-09-16 16:45:24
+     Target mtime  : 2026-09-06 21:14:39
+     Time Delta    : 847844.35s
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Letter of support template.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Letter of support template.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Letter of support template.docx
+     Source Size   : 21,512 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-16 13:51:17
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:07] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Letter of support template.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\Letter of support template.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\Letter of support template.docx
+     Source Size   : 21,512 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-16 13:51:17
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:08] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Zoha_Anecdote.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\1_Zoha_Anecdote.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\1_Zoha_Anecdote.docx
+     Source Size   : 14,664 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-17 17:54:42
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:08] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 3,792,920 bytes | Target: 3,792,379 bytes)
+     File Name     : 1_Zoha_CV_2026.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\1_Zoha_CV_2026.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\1_Zoha_CV_2026.docx
+     Source Size   : 3,792,920 bytes
+     Target Size   : 3,792,379 bytes
+     Source mtime  : 2026-09-17 18:53:09
+     Target mtime  : 2026-09-06 18:26:22
+     Time Delta    : 952006.60s
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:08] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Zoha_Personal_Statement.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\1_Zoha_Personal_Statement.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\1_Zoha_Personal_Statement.docx
+     Source Size   : 16,209 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-17 17:52:45
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:08] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 15,428 bytes | Target: 14,675 bytes)
+     File Name     : 2_Zoha_My notes from_meeting .docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\2_Zoha_My notes from_meeting .docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\2_Zoha_My notes from_meeting .docx
+     Source Size   : 15,428 bytes
+     Target Size   : 14,675 bytes
+     Source mtime  : 2026-09-17 19:13:51
+     Target mtime  : 2026-09-06 19:35:10
+     Time Delta    : 949120.65s
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:08] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Letter of support template.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\Letter of support template.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\Letter of support template.docx
+     Source Size   : 21,512 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-16 13:51:17
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-22 14:43:14] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 13,676,707 bytes | Target: 13,675,592 bytes)
+     File Name     : Immediate to do list.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\To do lists\Immediate to do list.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\To do lists\Immediate to do list.docx
+     Source Size   : 13,676,707 bytes
+     Target Size   : 13,675,592 bytes
+     Source mtime  : 2026-09-22 11:24:17
+     Target mtime  : 2026-09-15 13:49:07
+     Time Delta    : 596110.00s
+----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-22 14:47:35
+ Audit Execution Time      : 165.82 seconds
+ Candidate Files Inspected : 127,600
+ Total Files Requiring Sync: 4
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : TIMESTAMP_DRIFT (Delta: 100081.84s > 3.0s threshold)
+     File Name     : Pdexter's Quicken Data.QDF
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Size   : 193,306,624 bytes
+     Target Size   : 193,306,624 bytes
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : 2026-09-04 10:40:51
+     Time Delta    : 100081.84s
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[4] SYNC EVENT: SAN Sync: Quicken -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Relative Path : BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Path   : \\?\C:\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:18] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : IU Review Data_2026.xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\IU Review Data_2026.xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\IU Review Data_2026.xlsx
+     Source Size   : 131,072 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-24 17:56:29
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:18] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Indiana U_Sept 2026 Pull_Clean.xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\Indiana U_Sept 2026 Pull_Clean.xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\Indiana U_Sept 2026 Pull_Clean.xlsx
+     Source Size   : 21,302 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-24 17:26:50
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:18] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Myriad 081926 copy.xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\Myriad 081926 copy.xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\Myriad 081926 copy.xlsx
+     Source Size   : 55,965 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-24 17:53:54
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:18] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : LUNG.pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\LUNG.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\LUNG.pdf
+     Source Size   : 200,432 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-23 14:30:27
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:18] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : PG Referral_FW_08.15.26.xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\PG Referral_FW_08.15.26.xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\PG Referral_FW_08.15.26.xlsx
+     Source Size   : 81,865 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-24 18:56:40
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:18] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : implementing-a-discharge-follow-up-phone-call-program.pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\implementing-a-discharge-follow-up-phone-call-program.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\implementing-a-discharge-follow-up-phone-call-program.pdf
+     Source Size   : 526,447 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-22 20:41:32
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:18] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : nurse-and-patient-outcomes-across-pathway-to-excellence.pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\nurse-and-patient-outcomes-across-pathway-to-excellence.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\nurse-and-patient-outcomes-across-pathway-to-excellence.pdf
+     Source Size   : 680,725 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-22 20:42:31
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:18] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Progress_Report_144194_2024-12-01T00_00_00_3S.pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\Progress_Report_144194_2024-12-01T00_00_00_3S.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\Progress_Report_144194_2024-12-01T00_00_00_3S.pdf
+     Source Size   : 444,803 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-26 12:36:22
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : reducing-community-acquired-cdiff-admissions-outpatient.pdf
+     Source Path   : C:\Users\Paul Dexter\Downloads\reducing-community-acquired-cdiff-admissions-outpatient.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\reducing-community-acquired-cdiff-admissions-outpatient.pdf
+     Source Size   : 807,599 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-22 20:41:58
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Invitae lab tests 2019-2025.xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\OneDrive_1_9-24-2026\Invitae lab tests 2019-2025.xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\OneDrive_1_9-24-2026\Invitae lab tests 2019-2025.xlsx
+     Source Size   : 900,497 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-24 16:21:03
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : IU Health Invitae Her Can Tests 2019-Sept 2026.xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\OneDrive_1_9-24-2026\IU Health Invitae Her Can Tests 2019-Sept 2026.xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\OneDrive_1_9-24-2026\IU Health Invitae Her Can Tests 2019-Sept 2026.xlsx
+     Source Size   : 1,050,429 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-24 16:21:03
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Invitae lab tests 2019-2025 headings.xlsx
+     Source Path   : C:\Users\Paul Dexter\Downloads\OneDrive_2_9-24-2026\Invitae lab tests 2019-2025 headings.xlsx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\Downloads\OneDrive_2_9-24-2026\Invitae lab tests 2019-2025 headings.xlsx
+     Source Size   : 85,919 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-24 16:20:43
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : COPD sas code.txt
+     Source Path   : C:\Users\Paul Dexter\OneDrive\COPD sas code.txt
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\COPD sas code.txt
+     Source Size   : 25,058 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-23 17:39:39
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : COPD plain english analysis.txt
+     Source Path   : C:\Users\Paul Dexter\OneDrive\COPD plain english analysis.txt
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\COPD plain english analysis.txt
+     Source Size   : 4,818 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-23 18:23:36
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : coughNLPmanuscript.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\coughNLPmanuscript.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\coughNLPmanuscript.docx
+     Source Size   : 112,242 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-23 10:56:21
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Immunosuppressed and RSV.txt
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Immunosuppressed and RSV.txt
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Immunosuppressed and RSV.txt
+     Source Size   : 17,405 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-25 23:27:19
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : IGNITE_Secondary_Chronic_PainAuthorship_change_form_CRediT_6-1.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\IGNITE_Secondary_Chronic_PainAuthorship_change_form_CRediT_6-1.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\IGNITE_Secondary_Chronic_PainAuthorship_change_form_CRediT_6-1.pdf
+     Source Size   : 771,651 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-23 16:10:52
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : IGNITE_Secondary_Chronic_PainAuthorship_change_form_CRediT_6.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\IGNITE_Secondary_Chronic_PainAuthorship_change_form_CRediT_6.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\IGNITE_Secondary_Chronic_PainAuthorship_change_form_CRediT_6.pdf
+     Source Size   : 771,651 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-23 16:09:11
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:19] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Merck feasibility Sept 25 2026.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Merck feasibility Sept 25 2026.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Merck feasibility Sept 25 2026.docx
+     Source Size   : 20,969 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-25 23:21:14
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:20] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Weiner Cough - Identifying and characterizing.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Weiner Cough - Identifying and characterizing.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Weiner Cough - Identifying and characterizing.pdf
+     Source Size   : 331,281 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-23 11:02:11
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:20] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 103,639 bytes | Target: 103,893 bytes)
+     File Name     : Aarthi Chockalingam letter of recommendation.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi Chockalingam letter of recommendation.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Aarthi Chockalingam\Aarthi Chockalingam letter of recommendation.pdf
+     Source Size   : 103,639 bytes
+     Target Size   : 103,893 bytes
+     Source mtime  : 2026-09-22 21:00:08
+     Target mtime  : 2026-09-16 14:29:04
+     Time Delta    : 541864.19s
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:20] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Sai Chalasani letter of recommendation.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Sai Chalasani letter of recommendation.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Sai Chalasani\Sai Chalasani letter of recommendation.pdf
+     Source Size   : 102,677 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-22 21:00:04
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:20] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : 1_Wright_Anecdote.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\1_Wright_Anecdote.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\1_Wright_Anecdote.docx
+     Source Size   : 14,503 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-22 19:56:00
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:20] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 23,001 bytes | Target: 21,512 bytes)
+     File Name     : Letter of support template.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\Letter of support template.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\Letter of support template.docx
+     Source Size   : 23,001 bytes
+     Target Size   : 21,512 bytes
+     Source mtime  : 2026-09-22 22:17:29
+     Target mtime  : 2026-09-16 13:51:17
+     Time Delta    : 548772.00s
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:20] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : William Wright letter of recommendation.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\William Wright letter of recommendation.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\William Wright letter of recommendation.pdf
+     Source Size   : 81,094 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-22 22:17:51
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:20] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 29,324 bytes | Target: 27,736 bytes)
+     File Name     : William Wright letter of recommendation.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\William Wright letter of recommendation.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\William Wright\William Wright letter of recommendation.docx
+     Source Size   : 29,324 bytes
+     Target Size   : 27,736 bytes
+     Source mtime  : 2026-09-22 21:55:01
+     Target mtime  : 2026-09-07 11:16:49
+     Time Delta    : 1334291.46s
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:21] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : NEW_FILE (Target file missing on local backup)
+     File Name     : Zoha Khan letter of recommendation.pdf
+     Source Path   : C:\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\Zoha Khan letter of recommendation.pdf
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\Clinical\Letters of recommendation\2026 letters\Zoha Khan\Zoha Khan letter of recommendation.pdf
+     Source Size   : 105,179 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-22 20:59:57
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[2026-09-27 14:28:25] SYNC EVENT: Local D:\ Backup
+     Prompt Reason : SIZE_MISMATCH (Source: 13,677,106 bytes | Target: 13,676,707 bytes)
+     File Name     : Immediate to do list.docx
+     Source Path   : C:\Users\Paul Dexter\OneDrive\To do lists\Immediate to do list.docx
+     Target Path   : D:\Backups\Documents\Users\Paul Dexter\OneDrive\To do lists\Immediate to do list.docx
+     Source Size   : 13,677,106 bytes
+     Target Size   : 13,676,707 bytes
+     Source mtime  : 2026-09-25 20:09:11
+     Target mtime  : 2026-09-22 11:24:17
+     Time Delta    : 290694.00s
+----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-27 14:34:35
+ Audit Execution Time      : 176.03 seconds
+ Candidate Files Inspected : 127,623
+ Total Files Requiring Sync: 4
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : TIMESTAMP_DRIFT (Delta: 1672026.04s > 3.0s threshold)
+     File Name     : Pdexter's Quicken Data.QDF
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Size   : 193,306,624 bytes
+     Target Size   : 193,306,624 bytes
+     Source mtime  : 2026-09-23 19:07:57
+     Target mtime  : 2026-09-04 10:40:51
+     Time Delta    : 1672026.04s
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[4] SYNC EVENT: SAN Sync: Quicken -> NAS
+     Prompt Reason : TIMESTAMP_DRIFT (Delta: 1571944.20s > 3.0s threshold)
+     File Name     : Pdexter's Quicken Data.QDF
+     Relative Path : Pdexter's Quicken Data.QDF
+     Source Path   : \\?\C:\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Target Path   : \\Synology_NAS\Videos and pics\Quicken\Pdexter's Quicken Data.QDF
+     Source Size   : 193,306,624 bytes
+     Target Size   : 193,306,624 bytes
+     Source mtime  : 2026-09-23 19:07:57
+     Target mtime  : 2026-09-05 14:28:53
+     Time Delta    : 1571944.20s
+----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-27 14:41:11
+ Audit Execution Time      : 136.71 seconds
+ Candidate Files Inspected : 127,623
+ Total Files Requiring Sync: 3
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : TIMESTAMP_DRIFT (Delta: 1672026.04s > 3.0s threshold)
+     File Name     : Pdexter's Quicken Data.QDF
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Size   : 193,306,624 bytes
+     Target Size   : 193,306,624 bytes
+     Source mtime  : 2026-09-23 19:07:57
+     Target mtime  : 2026-09-04 10:40:51
+     Time Delta    : 1672026.04s
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-27 14:46:09
+ Audit Execution Time      : 127.13 seconds
+ Candidate Files Inspected : 127,623
+ Total Files Requiring Sync: 3
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : TIMESTAMP_DRIFT (Delta: 1672026.04s > 3.0s threshold)
+     File Name     : Pdexter's Quicken Data.QDF
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Size   : 193,306,624 bytes
+     Target Size   : 193,306,624 bytes
+     Source mtime  : 2026-09-23 19:07:57
+     Target mtime  : 2026-09-04 10:40:51
+     Time Delta    : 1672026.04s
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-27 14:54:48
+ Audit Execution Time      : 125.07 seconds
+ Candidate Files Inspected : 127,623
+ Total Files Requiring Sync: 3
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : TIMESTAMP_DRIFT (Delta: 1672026.04s > 3.0s threshold)
+     File Name     : Pdexter's Quicken Data.QDF
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Size   : 193,306,624 bytes
+     Target Size   : 193,306,624 bytes
+     Source mtime  : 2026-09-23 19:07:57
+     Target mtime  : 2026-09-04 10:40:51
+     Time Delta    : 1672026.04s
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-27 15:30:21
+ Audit Execution Time      : 196.57 seconds
+ Candidate Files Inspected : 127,623
+ Total Files Requiring Sync: 3
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : TIMESTAMP_DRIFT (Delta: 1672026.04s > 3.0s threshold)
+     File Name     : Pdexter's Quicken Data.QDF
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Size   : 193,306,624 bytes
+     Target Size   : 193,306,624 bytes
+     Source mtime  : 2026-09-23 19:07:57
+     Target mtime  : 2026-09-04 10:40:51
+     Time Delta    : 1672026.04s
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-27 15:47:10
+ Audit Execution Time      : 231.43 seconds
+ Candidate Files Inspected : 127,623
+ Total Files Requiring Sync: 3
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : TIMESTAMP_DRIFT (Delta: 1672026.04s > 3.0s threshold)
+     File Name     : Pdexter's Quicken Data.QDF
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Size   : 193,306,624 bytes
+     Target Size   : 193,306,624 bytes
+     Source mtime  : 2026-09-23 19:07:57
+     Target mtime  : 2026-09-04 10:40:51
+     Time Delta    : 1672026.04s
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+========================================================================================
+                  OPENSEARCH BACKUP & SAN SYNC AUDIT REPORT REPORT                      
+========================================================================================
+ Report Timestamp          : 2026-09-27 18:12:32
+ Audit Execution Time      : 147.34 seconds
+ Candidate Files Inspected : 127,623
+ Total Files Requiring Sync: 3
+========================================================================================
+
+[1] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : TIMESTAMP_DRIFT (Delta: 1672026.04s > 3.0s threshold)
+     File Name     : Pdexter's Quicken Data.QDF
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\Pdexter's Quicken Data.QDF
+     Source Size   : 193,306,624 bytes
+     Target Size   : 193,306,624 bytes
+     Source mtime  : 2026-09-23 19:07:57
+     Target mtime  : 2026-09-04 10:40:51
+     Time Delta    : 1672026.04s
+----------------------------------------------------------------------------------------
+[2] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-2026-09-05.PM02.28.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
+[3] SYNC EVENT: SAN Sync: D:\Backups -> NAS
+     Prompt Reason : NEW_FILE (Target file missing on backup)
+     File Name     : Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Relative Path : Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Path   : \\?\D:\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Target Path   : \\Synology_NAS\Videos and pics\Backups\Documents\Users\Paul Dexter\OneDrive\Finances and family\Quicken\BACKUP\Pdexter's Quicken Data-R-69.25-2026-09-22.QDF-backup
+     Source Size   : 193,306,624 bytes
+     Target Size   : N/A
+     Source mtime  : 2026-09-05 14:28:53
+     Target mtime  : N/A
+     Time Delta    : N/A
+----------------------------------------------------------------------------------------
