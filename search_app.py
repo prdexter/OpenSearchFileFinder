@@ -184,6 +184,7 @@ img {{ max-width: 100%; height: auto; display: block; margin: 12px 0; border-rad
 </head>
 <body>
 <div class="container">{html_body}</div>
+<iframe id="_protocolFrame" src="about:blank" style="display:none"></iframe>
 </body>
 </html>"""
                 out_dir = os.path.dirname(cache_path)
@@ -867,6 +868,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <!-- SheetJS for client-side Excel XLSX/XLS/CSV rendering -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
+        html, body { overflow-anchor: none; scroll-behavior: auto; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1350px; margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 15px; }
@@ -902,11 +904,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         .btn-page.disabled { background-color: #e9ecef; color: #adb5bd; pointer-events: none; cursor: default; }
 
         /* 2-Column Result Card Layout with 400px Right Column Preview */
-        .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; gap: 24px; align-items: flex-start; }
+        .result-card { background: white; border-radius: 8px; padding: 18px; margin-bottom: 15px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; gap: 24px; align-items: flex-start; contain: layout; }
         .card-left { flex: 1; min-width: 0; }
         .card-right { flex-shrink: 0; width: 400px; }
         
-        .thumb-preview { width: 100%; border-radius: 6px; border: 1px solid #dee2e6; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; background: #fff; }
+        .thumb-preview { width: 100%; height: auto; aspect-ratio: 5/6; will-change: transform; border-radius: 6px; border: 1px solid #dee2e6; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; background: #f8f9fa; }
         .thumb-preview:hover { transform: scale(1.03); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
         .thumb-placeholder { width: 100%; height: 360px; background: #f1f3f5; border-radius: 6px; border: 1px dashed #ced4da; display: flex; align-items: center; justify-content: center; color: #adb5bd; font-size: 14px; font-weight: 500; text-align: center; padding: 10px; }
 
@@ -980,7 +982,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         </div>
 
         <form class="search-box" method="GET" action="/">
-            <input type="text" name="q" value="{QUERY}" placeholder="Try: 'pdf quality disparities', 'quality NOT IUH', 'xlsx pathology'..." autofocus>
+            <input type="text" name="q" value="{QUERY}" placeholder="Try: 'pdf quality disparities', 'quality NOT IUH', 'xlsx pathology'...">
             <select name="sort" onchange="this.form.submit()">
                 <option value="relevance" {SORT_RELEVANCE}>Best Match (Relevance)</option>
                 <option value="date_desc" {SORT_DATE_DESC}>Date: Newest First</option>
@@ -1045,9 +1047,23 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         let selectedPaths = new Set();
         let isIndexing = false;
 
+        if('scrollRestoration' in history) history.scrollRestoration='manual';
+
         document.addEventListener('DOMContentLoaded', function() {
+            const sy = sessionStorage.getItem('searchScrollY');
+            if(sy){
+                requestAnimationFrame(()=>{
+                    window.scrollTo({top:parseInt(sy),behavior:'instant'});
+                    sessionStorage.removeItem('searchScrollY');
+                });
+            }
+            _intendedScrollY = parseInt(sy||'0');
             checkStatus();
-            setInterval(checkStatus, 1000);
+            setInterval(checkStatus, 2000);
+        });
+
+        window.addEventListener('beforeunload', ()=>{
+            if(window.scrollY > 0) sessionStorage.setItem('searchScrollY', window.scrollY);
         });
 
         function showToast(msg, isError=false) {
@@ -1118,6 +1134,17 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             document.getElementById('viewerContainer').innerHTML = '';
         }
 
+        // Trigger custom protocol URIs without navigating the page
+        function triggerProtocol(url) {
+            const f = document.getElementById('_protocolFrame');
+            if(f) { f.src = url; } else {
+                const a = document.createElement('a');
+                a.href = url; a.style.display='none';
+                document.body.appendChild(a); a.click();
+                setTimeout(()=>document.body.removeChild(a), 500);
+            }
+        }
+
         async function handleOpenFile(filePath, customUrl) {
             try {
                 const res = await fetch('/api/open_file?path=' + encodeURIComponent(filePath));
@@ -1130,7 +1157,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                     showToast('Opening file in default application...');
                 }
             } catch (e) {
-                window.location.href = customUrl;
+                if(customUrl) triggerProtocol(customUrl);
             }
         }
 
@@ -1146,7 +1173,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                     showToast('Opening folder in Windows File Explorer...');
                 }
             } catch (e) {
-                window.location.href = customUrl;
+                if(customUrl) triggerProtocol(customUrl);
             }
         }
 
@@ -1162,7 +1189,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                     showToast('Opening folder in Directory Opus...');
                 }
             } catch (e) {
-                window.location.href = customUrl;
+                if(customUrl) triggerProtocol(customUrl);
             }
         }
 
@@ -1848,8 +1875,8 @@ class SearchHandler(SimpleHTTPRequestHandler):
 
                         # Render Right Column Visual Cover Preview Card for ALL Document Types
                         thumb_html = f"""
-                        <div class="card-right">
-                            <img src="{thumb_url}" class="thumb-preview" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}', '{ftype}')" title="Click to view live full document preview" alt="Document Preview">
+                        <div class="card-right" style="min-height:200px;">
+                            <img src="{thumb_url}" class="thumb-preview" width="300" height="360" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}', '{ftype}')" title="Click to view live full document preview" alt="Document Preview">
                         </div>
                         """
 

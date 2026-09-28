@@ -72,6 +72,7 @@ SUPPORTED_EXTENSIONS = {
     ".xlsx", ".xlsm", ".xls",
     ".pdf",
     ".json",
+    ".parquet",          # always flagged HIGH (binary columnar format)
 }
 
 SKIP_DIRECTORY_NAMES = {
@@ -243,6 +244,25 @@ HIGH_RISK_HEADERS = {
     "dea", "dea number",
 }
 
+# Substrings that, if found anywhere in a column header, trigger HIGH risk.
+# Applied case-insensitively after stripping whitespace.
+HEADER_PHI_SUBSTRINGS = {
+    "name",      # first_name, last_name, patient_name, provider_name, etc.
+    "mrn",       # any field containing MRN
+    "date",      # encounter_date, visit_date, dob, dod, order_date, etc.
+    "dob",       # date_of_birth, dob_year, etc.
+    "dod",       # date_of_death, dod, etc.
+    "death",     # death_date, date_of_death, cause_of_death
+    "admit",     # admit_date, admission_date, ADMIT, admitdx, etc.
+    "discharge", # discharge_date, DISCHARGE, dischargedx, etc.
+    "order",     # order_date, ORDERDT, orderid, etc.
+    "year",      # birth_year, admit_year, order_year, etc.
+    "patient",   # patient_id, patient_name, patientid, etc.
+    "person",    # personid, person_id, etc.
+    "dt",        # orderdt, admit_dt, encounter_dt, etc.
+    "id",        # any identifier field: studyid, encounterid, surgeryid, proc_id, etc.
+}
+
 MEDIUM_RISK_HEADERS = {
     "patient id", "patient_id", "patientid", "patient number",
     "member id", "member_id", "memberid",
@@ -292,6 +312,12 @@ def analyze_headers(headers):
             findings[f"PHI column/header: {normalized}"] += 1
         elif normalized in MEDIUM_RISK_HEADERS:
             findings[f"Identifier column/header: {normalized}"] += 1
+        else:
+            # Substring check: flag if any PHI keyword appears anywhere in the header
+            for kw in HEADER_PHI_SUBSTRINGS:
+                if kw in normalized:
+                    findings[f"PHI keyword in header: {normalized}"] += 1
+                    break
     return findings
 
 
@@ -319,7 +345,13 @@ def classify_risk(findings):
 
     if names.intersection(high_indicators):
         return "HIGH"
+    # Parquet files are always HIGH — binary columnar format may contain PHI
+    # with no way to inspect content without pyarrow
+    if any(n.startswith("Parquet file") for n in names):
+        return "HIGH"
     if any(n.startswith("PHI column/header:") for n in names):
+        return "HIGH"
+    if any(n.startswith("PHI keyword in header:") for n in names):
         return "HIGH"
     if len(names) >= 3:
         return "HIGH"
@@ -363,32 +395,44 @@ def safe_file_size(path):
 # FILE READERS
 # ============================================================
 
+MAX_SCAN_ROWS = 100  # regex-scan only this many data rows per CSV/Excel file
+
 def scan_plain_text(path):
     findings = Counter()
+    ext = path.suffix.lower()
+    is_tabular = ext in {".csv", ".tsv"}
+    delimiter = "\t" if ext == ".tsv" else ","
     encodings = ["utf-8", "utf-8-sig", "cp1252", "latin-1"]
-    text = None
+
+    lines = None
     for enc in encodings:
         try:
             with open(path, "r", encoding=enc, errors="strict") as f:
-                text = f.read(MAX_TEXT_CHARS)
+                if is_tabular:
+                    lines = [f.readline() for _ in range(MAX_SCAN_ROWS + 1)]
+                else:
+                    lines = [f.read(MAX_TEXT_CHARS)]
             break
         except UnicodeDecodeError:
             continue
-    if text is None:
+    if lines is None:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
-            text = f.read(MAX_TEXT_CHARS)
+            if is_tabular:
+                lines = [f.readline() for _ in range(MAX_SCAN_ROWS + 1)]
+            else:
+                lines = [f.read(MAX_TEXT_CHARS)]
 
-    merge_findings(findings, analyze_text(text))
-
-    if path.suffix.lower() in {".csv", ".tsv"}:
-        first_line = text.splitlines()[0] if text else ""
-        delimiter = "\t" if path.suffix.lower() == ".tsv" else ","
+    if is_tabular:
         try:
-            headers = next(csv.reader([first_line], delimiter=delimiter))
-            merge_findings(findings, analyze_headers(headers))
+            header_row = next(csv.reader([lines[0]], delimiter=delimiter), [])
+            merge_findings(findings, analyze_headers(header_row))
         except Exception:
             pass
+        text = "".join(lines[1:])
+    else:
+        text = lines[0] if lines else ""
 
+    merge_findings(findings, analyze_text(text))
     return findings, None
 
 
@@ -428,23 +472,21 @@ def scan_excel_xlsx(path):
     findings = Counter()
     wb = openpyxl.load_workbook(filename=path, read_only=True, data_only=True)
     try:
-        total_chars = 0
         for ws in wb.worksheets:
-            first_nonempty = 0
+            header_done = False
+            data_rows = 0
             for row in ws.iter_rows(values_only=True):
                 values = [str(v) for v in row if v is not None]
                 if not values:
                     continue
-                if first_nonempty < 3:
+                if not header_done:
                     merge_findings(findings, analyze_headers(values))
-                    first_nonempty += 1
-                text = " | ".join(values)
-                merge_findings(findings, analyze_text(text))
-                total_chars += len(text)
-                if total_chars >= MAX_TEXT_CHARS:
+                    header_done = True
+                    continue
+                merge_findings(findings, analyze_text(" | ".join(values)))
+                data_rows += 1
+                if data_rows >= MAX_SCAN_ROWS:
                     break
-            if total_chars >= MAX_TEXT_CHARS:
-                break
     finally:
         wb.close()
     return findings, None
@@ -458,28 +500,18 @@ def scan_excel_xls(path):
     except Exception as e:
         return findings, f"XLS READ ERROR: {type(e).__name__}"
 
-    total_chars = 0
     for sheet_name in wb.sheet_names():
         ws = wb.sheet_by_name(sheet_name)
-        first_nonempty = 0
-        for row_idx in range(ws.nrows):
-            values = [
-                str(ws.cell_value(row_idx, c))
-                for c in range(ws.ncols)
-                if ws.cell_value(row_idx, c) not in (None, "")
-            ]
-            if not values:
-                continue
-            if first_nonempty < 3:
-                merge_findings(findings, analyze_headers(values))
-                first_nonempty += 1
-            text = " | ".join(values)
-            merge_findings(findings, analyze_text(text))
-            total_chars += len(text)
-            if total_chars >= MAX_TEXT_CHARS:
-                break
-        if total_chars >= MAX_TEXT_CHARS:
-            break
+        if ws.nrows == 0:
+            continue
+        headers = [str(ws.cell_value(0, c)) for c in range(ws.ncols)
+                   if ws.cell_value(0, c) not in (None, "")]
+        merge_findings(findings, analyze_headers(headers))
+        for row_idx in range(1, min(ws.nrows, MAX_SCAN_ROWS + 1)):
+            values = [str(ws.cell_value(row_idx, c)) for c in range(ws.ncols)
+                      if ws.cell_value(row_idx, c) not in (None, "")]
+            if values:
+                merge_findings(findings, analyze_text(" | ".join(values)))
     return findings, None
 
 
@@ -542,6 +574,24 @@ def scan_json(path):
     return findings, None
 
 
+def scan_parquet(path):
+    """Parquet files are binary columnar format — auto-flag HIGH.
+    Attempt to read column names via pyarrow if available; otherwise flag blind."""
+    findings = Counter()
+    findings["Parquet file (binary columnar — header check only)"] += 1
+    try:
+        import pyarrow.parquet as pq  # optional — not required
+        schema = pq.read_schema(str(path))
+        headers = [str(f.name) for f in schema]
+        merge_findings(findings, analyze_headers(headers))
+        findings["Parquet columns read"] = len(headers)
+    except ImportError:
+        findings["Parquet (pyarrow not installed — column names unread)"] += 1
+    except Exception as e:
+        findings[f"Parquet read error: {type(e).__name__}"] += 1
+    return findings, None
+
+
 # ============================================================
 # FILE DISPATCH
 # ============================================================
@@ -560,6 +610,8 @@ def scan_file(path):
         return scan_pdf(path)
     elif ext == ".json":
         return scan_json(path)
+    elif ext == ".parquet":
+        return scan_parquet(path)
     return Counter(), None
 
 
@@ -757,6 +809,7 @@ def run_scan(root, report_path, min_risk="LOW", workers=4):
     print("=" * 60)
     print("  SUMMARY")
     print("=" * 60)
+    print(f"  Root               : {root}")
     print(f"  Total scanned      : {scanned:,}")
     print(f"  Flagged (non-NONE) : {flagged:,}")
     print(f"  Access errors      : {errors:,}")
@@ -773,6 +826,28 @@ def run_scan(root, report_path, min_risk="LOW", workers=4):
     print(f"  Report saved to: {report_path}")
     print("=" * 60)
     print()
+
+    # Write machine-readable summary for phi_app.py to display
+    from datetime import datetime as _dt
+    summary = {
+        "scan_root":        str(root),
+        "scan_date":        _dt.now().isoformat(),
+        "total_scanned":    scanned,
+        "total_flagged":    flagged,
+        "access_errors":    errors,
+        "ocr_needed":       ocr_needed,
+        "by_risk":          dict(risk_counts),
+        "by_extension":     dict(sorted(extension_counts.items(), key=lambda x: -x[1])[:20]),
+        "report_path":      str(report_path),
+    }
+    summary_path = Path(report_path).with_name("phi_scan_summary.json")
+    try:
+        with open(summary_path, "w", encoding="utf-8") as _sf:
+            import json as _json
+            _json.dump(summary, _sf, indent=2)
+        print(f"SUMMARY_JSON:{summary_path}")
+    except Exception as _e:
+        print(f"Warning: could not write summary JSON: {_e}")
 
 
 # ============================================================

@@ -171,6 +171,18 @@ def save_phi_progress(data):
         pass
 
 
+
+PHI_SUMMARY_FILE = os.path.join(BASE_DIR, "phi_scan_summary.json")
+
+def load_phi_summary():
+    if os.path.exists(PHI_SUMMARY_FILE):
+        try:
+            with open(PHI_SUMMARY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
 # ---------------------------------------------------------------------------
 # Directory helpers
 # ---------------------------------------------------------------------------
@@ -489,6 +501,11 @@ def run_phi_scan(directories, min_risk="LOW", workers=4):
                     prog["current_dir"]  = current_dir
                     prog["status_message"] = f"\U0001f50d Scanning: {current_dir}"
                     save_phi_progress(prog)
+                elif line.startswith("SUMMARY_JSON:"):
+                    summary_path = line.split(":", 1)[1].strip()
+                    prog = load_phi_progress()
+                    prog["summary_path"] = summary_path
+                    save_phi_progress(prog)
                 elif line and not line.startswith("="):
                     # Collect file totals line: "X,XXX files found"
                     m_total = re.search(r"([\d,]+)\s+files found", line)
@@ -569,6 +586,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <meta charset="UTF-8">
     <title>PHI Scanner</title>
     <style>
+        html,body{overflow-anchor:none;scroll-behavior:auto}
         body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#1a1a2e;margin:0;padding:20px;color:#e0e0e0}
         .container{max-width:1350px;margin:0 auto}
         .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:2px solid #2d2d4e;padding-bottom:15px}
@@ -596,8 +614,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .result-card.risk-low{border-left-color:#b7950b}
         .card-left{flex:1;min-width:0}
         .card-right{flex-shrink:0;width:380px}
-        .thumb-preview{width:100%;border-radius:6px;border:1px solid #3d3d5e;box-shadow:0 2px 8px rgba(0,0,0,.4)}
-        .thumb-placeholder{width:100%;height:300px;background:#1a2744;border-radius:6px;border:1px dashed #3d3d5e;display:flex;align-items:center;justify-content:center;color:#6c757d;font-size:14px}
+        .thumb-preview{width:100%;height:auto;aspect-ratio:5/6;will-change:transform;border-radius:6px;border:1px solid #3d3d5e;box-shadow:0 2px 8px rgba(0,0,0,.4);background:#1a2744}
+        .thumb-placeholder{width:100%;height:300px;aspect-ratio:5/6;background:#1a2744;border-radius:6px;border:1px dashed #3d3d5e;display:flex;align-items:center;justify-content:center;color:#6c757d;font-size:14px}
         .result-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
         .file-title{font-weight:bold;font-size:17px;color:#e0e0e0}
         .card-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -649,7 +667,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
     </div>
     <form class="search-box" method="GET" action="/">
-        <input type="text" name="q" value="{QUERY}" placeholder="Search file names, finding categories (e.g. MRN, HIGH, patient)..." autofocus>
+        <input type="text" name="q" value="{QUERY}" placeholder="Search file names, finding categories (e.g. MRN, HIGH, patient)...">
         <select name="risk" onchange="this.form.submit()">
             <option value=""       {RISK_ALL}>All Risk Levels</option>
             <option value="HIGH"   {RISK_HIGH}>&#9888; HIGH Only</option>
@@ -667,11 +685,37 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </form>
     <div class="stats-bar">
         <div class="stats">{STATS}</div>
-        <div class="scan-badge" id="scanBadge">&#9889; PHI scan running...</div>
+        <div class="scan-badge" id="scanBadge" style="opacity:0;">&#9889; PHI scan running...</div>
+    </div>
+
+    <!-- Configured scan directories summary — shown before scan starts -->
+    <div id="dirSummaryPanel" style="background:#0d1b2a; border:1px solid #2d4a6e; border-radius:8px; padding:12px 18px; margin-bottom:12px; font-size:13px; color:#bdc3c7; opacity:0; pointer-events:none; transition:opacity 0.3s; min-height:2.5em;">
+        <span style="color:#6c757d; margin-right:8px;">&#128197; Will scan:</span>
+        <span id="dirSummaryList" style="color:#3498db; font-weight:600;"></span>
+        <span style="color:#6c757d; margin-left:16px; font-size:11px;">(change in <a href="javascript:void(0)" onclick="openConfigModal();" style="color:#6c757d;">Scan Directories</a>)</span>
+    </div>
+
+    <!-- Last scan summary banner -->
+    <div id="scanSummary" style="display:none; background:#0d1b2a; border:1px solid #2d4a6e; border-radius:8px; padding:14px 20px; margin-bottom:16px; font-size:13px; color:#bdc3c7;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+                <span style="color:#6c757d;">&#128204; Last scan:</span>
+                <strong id="sumRoot" style="color:#3498db;"></strong>
+                &nbsp;&mdash;&nbsp;<span id="sumDate" style="color:#9e9e9e; font-size:12px;"></span>
+            </div>
+            <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                <span>&#128269; <strong id="sumScanned" style="color:#e0e0e0;">0</strong> scanned</span>
+                <span style="color:#e74c3c;">HIGH: <strong id="sumHigh">0</strong></span>
+                <span style="color:#d35400;">MEDIUM: <strong id="sumMed">0</strong></span>
+                <span style="color:#b7950b;">LOW: <strong id="sumLow">0</strong></span>
+                <span style="color:#6c757d;">Errors: <strong id="sumErr">0</strong></span>
+            </div>
+        </div>
+        <div id="sumExtRow" style="margin-top:8px; border-top:1px solid #1d2d3e; padding-top:8px; color:#6c757d; font-size:11px;"></div>
     </div>
 
     <!-- Live scan progress panel — hidden when not scanning -->
-    <div id="progressPanel" style="display:none; background:#0d1b2a; border:1px solid #c0392b; border-radius:8px; padding:16px 20px; margin-bottom:16px; font-family:monospace; font-size:13px;">
+    <div id="progressPanel" style="position:fixed; bottom:20px; right:20px; width:380px; z-index:9999; opacity:0; pointer-events:none; transition:opacity 0.3s; border-radius:10px; background:#0d1b2a; border:1px solid #c0392b; border-radius:8px; padding:16px 20px; margin-bottom:16px; font-family:monospace; font-size:13px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span style="color:#e74c3c; font-weight:bold; font-size:14px;">&#9889; PHI Scan In Progress</span>
             <span id="progressFraction" style="color:#bdc3c7;">0 / 0 files</span>
@@ -686,9 +730,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
         <div style="border-top:1px solid #2d2d4e; padding-top:10px;">
             <div style="color:#7f8c8d; font-size:11px; margin-bottom:3px;">Current folder:</div>
-            <div id="progCurrentDir"  style="color:#3498db; word-break:break-all; margin-bottom:6px;">&mdash;</div>
+            <div id="progCurrentDir"  style="color:#3498db; word-break:break-all; margin-bottom:6px; min-height:1.4em; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">&mdash;</div>
             <div style="color:#7f8c8d; font-size:11px; margin-bottom:3px;">Current file:</div>
-            <div id="progCurrentFile" style="color:#bdc3c7; word-break:break-all;">&mdash;</div>
+<div id="progCurrentFile" style="color:#bdc3c7; word-break:break-all; min-height:1.4em; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">&mdash;</div>
         </div>
     </div>
     {PAGINATION_TOP}
@@ -722,7 +766,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </div>
 <script>
 let selectedPaths=new Set(),isScanning=false;
-document.addEventListener('DOMContentLoaded',()=>{checkStatus();setInterval(checkStatus,2000)});
+// Disable browser automatic scroll restoration
+if('scrollRestoration' in history) history.scrollRestoration='manual';
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const sy=sessionStorage.getItem('phiScrollY');
+  if(sy){
+    requestAnimationFrame(()=>{
+      window.scrollTo({top:parseInt(sy),behavior:'instant'});
+      sessionStorage.removeItem('phiScrollY');
+    });
+  }
+  checkStatus();
+  setInterval(checkStatus,3000);
+});
+
+window.addEventListener('beforeunload',()=>{
+  if(window.scrollY>0) sessionStorage.setItem('phiScrollY',window.scrollY);
+});
 function showToast(m,e=false){const t=document.getElementById('toastMsg');t.innerText=m;t.style.backgroundColor=e?'#c0392b':'#27ae60';t.style.display='block';setTimeout(()=>t.style.display='none',4000)}
 async function checkStatus(){
   try{
@@ -732,14 +793,14 @@ async function checkStatus(){
     const cb=document.getElementById('phiCountBadge');
     const panel=document.getElementById('progressPanel');
     isScanning=d.is_running;
-    if(d.phi_count!==undefined) cb.innerText='\uD83D\uDD12 PHI Results: '+d.phi_count.toLocaleString();
+    if(d.phi_count!==undefined) cb.innerText='🔒 PHI Results: '+d.phi_count.toLocaleString();
     if(btn){
       if(isScanning){
         btn.className='btn-scan running';
         btn.innerText='\u23F9 Stop Scan';
-        if(badge) badge.style.display='none';
+        if(badge) badge.style.opacity='0';
         if(panel){
-          panel.style.display='block';
+          panel.style.opacity='1';panel.style.pointerEvents='auto';
           const sc=d.scanned||0,tot=d.total||0,fl=d.flagged||0;
           const pct=tot>0?Math.round(sc/tot*100):0;
           document.getElementById('progressBar').style.width=pct+'%';
@@ -755,21 +816,53 @@ async function checkStatus(){
         }
       } else {
         btn.className='btn-scan';
-        btn.innerText='\uD83D\uDD12 Start PHI Scan';
-        if(badge) badge.style.display='none';
-        if(panel) panel.style.display='none';
-        if(d.status_message&&d.status_message.includes('\u2705')&&!window._reloaded){
-          window._reloaded=true;
-          setTimeout(()=>window.location.reload(),1500);
+        btn.innerText='🔒 Start PHI Scan';
+        if(badge) badge.style.opacity='0';
+        if(panel) panel.style.opacity='0';panel.style.pointerEvents='none';
+        // Populate last-scan summary banner
+        const sm=d.summary,sb=document.getElementById('scanSummary');
+        if(sb&&sm&&sm.total_scanned){
+          sb.style.display='block';
+          document.getElementById('sumRoot').innerText=sm.scan_root||'';
+          const dt=sm.scan_date?new Date(sm.scan_date).toLocaleString():'';
+          document.getElementById('sumDate').innerText=dt;
+          document.getElementById('sumScanned').innerText=(sm.total_scanned||0).toLocaleString();
+          document.getElementById('sumHigh').innerText=(sm.by_risk&&sm.by_risk.HIGH)||0;
+          document.getElementById('sumMed').innerText=(sm.by_risk&&sm.by_risk.MEDIUM)||0;
+          document.getElementById('sumLow').innerText=(sm.by_risk&&sm.by_risk.LOW)||0;
+          document.getElementById('sumErr').innerText=(sm.access_errors||0);
+          const exts=sm.by_extension?Object.entries(sm.by_extension).map(([k,v])=>k+': '+v).join(' \u00b7 '):'';
+          document.getElementById('sumExtRow').innerText=exts?'File types: '+exts:'';
+        }
+        if(d.status_message&&d.status_message.includes('\u2705')&&sessionStorage.getItem('phiReloaded')!=='1'){
+          sessionStorage.setItem('phiReloaded','1');
+          sessionStorage.setItem('phiScrollY',window.scrollY);setTimeout(()=>window.location.reload(),1500);
         }
       }
     }
   } catch(e){}
 }
-async function toggleScan(){if(isScanning){await fetch('/api/stop_phi_scan',{method:'POST'});showToast('PHI scan stopped.');checkStatus()}else{const r=await fetch('/api/phi_config'),c=await r.json();if(!c.selected_directories||c.selected_directories.length===0){showToast('Configure scan directories first.',true);openConfigModal();return}await fetch('/api/start_phi_scan',{method:'POST'});window._reloaded=false;showToast('PHI scan started...');checkStatus()}}
+async function loadDirSummary(){
+  try {
+    const r=await fetch('/api/phi_config'), c=await r.json();
+    const dirs=c.selected_directories||[];
+    const panel=document.getElementById('dirSummaryPanel');
+    const list=document.getElementById('dirSummaryList');
+    if(dirs.length>0){
+      list.innerText=dirs.join('  ▸  ');
+      panel.style.opacity='1';panel.style.pointerEvents='auto';
+    } else {
+      list.innerHTML='<span style="color:#e74c3c;">No directories configured</span>';
+      panel.style.opacity='1';panel.style.pointerEvents='auto';
+    }
+  } catch(e){}
+}
+loadDirSummary();
+
+async function toggleScan(){if(isScanning){await fetch('/api/stop_phi_scan',{method:'POST'});showToast('PHI scan stopped.');checkStatus()}else{const r=await fetch('/api/phi_config'),c=await r.json();if(!c.selected_directories||c.selected_directories.length===0){showToast('Configure scan directories first.',true);openConfigModal();return}await fetch('/api/start_phi_scan',{method:'POST'});sessionStorage.removeItem('phiReloaded');showToast('PHI scan started...');checkStatus()}}
 async function openConfigModal(){document.getElementById('configModal').style.display='block';const r=await fetch('/api/phi_config'),c=await r.json();selectedPaths=new Set(c.selected_directories||[]);document.getElementById('minRiskSelect').value=c.min_risk||'LOW';document.getElementById('workersInput').value=c.workers||4;loadDriveTree()}
 function closeConfigModal(){document.getElementById('configModal').style.display='none'}
-async function saveConfig(){const dirs=Array.from(selectedPaths),mr=document.getElementById('minRiskSelect').value,w=parseInt(document.getElementById('workersInput').value)||4;await fetch('/api/phi_config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({selected_directories:dirs,min_risk:mr,workers:w})});document.getElementById('configStatus').innerText='\\u2713 Saved!';setTimeout(()=>{closeConfigModal();document.getElementById('configStatus').innerText=''},1000)}
+async function saveConfig(){const dirs=Array.from(selectedPaths),mr=document.getElementById('minRiskSelect').value,w=parseInt(document.getElementById('workersInput').value)||4;await fetch('/api/phi_config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({selected_directories:dirs,min_risk:mr,workers:w})});document.getElementById('configStatus').innerText='\\u2713 Saved!';setTimeout(()=>{closeConfigModal();document.getElementById('configStatus').innerText='';loadDirSummary()},1000)}
 async function loadDriveTree(){const c=document.getElementById('treeContainer');c.innerHTML='';const r=await fetch('/api/drives'),drives=await r.json();for(const d of drives)c.appendChild(buildItem(d,'\\uD83D\\uDCBB '+d,true))}
 function buildItem(path,label,bold=false){const item=document.createElement('div');item.className='tree-item';const tg=document.createElement('span');tg.className='tree-toggle';tg.innerText='\\u25B6';tg.setAttribute('data-path',path);tg.onclick=function(){toggleF(this)};const cb=document.createElement('input');cb.type='checkbox';cb.value=path;cb.checked=selectedPaths.has(path);cb.onchange=function(){this.checked?selectedPaths.add(this.value):selectedPaths.delete(this.value)};const lb=document.createElement(bold?'strong':'span');lb.innerHTML=' '+label;const ch=document.createElement('div');ch.className='tree-children';item.appendChild(tg);item.appendChild(cb);item.appendChild(lb);item.appendChild(ch);return item}
 async function toggleF(el){const path=el.getAttribute('data-path'),ch=el.parentElement.querySelector('.tree-children');if(el.innerText==='\\u25B6'){el.innerText='\\u25BC';ch.classList.add('open');if(!ch.children.length){const r=await fetch('/api/ls?path='+encodeURIComponent(path)),subs=await r.json();if(!subs.length)ch.innerHTML='<div style="margin-left:20px;color:#555;font-style:italic">(no subfolders)</div>';else for(const s of subs)ch.appendChild(buildItem(s.path,'\\uD83D\\uDCC1 '+s.name))}}else{el.innerText='\\u25B6';ch.classList.remove('open')}}
@@ -777,6 +870,7 @@ async function handleOpenFile(p){try{const r=await fetch('/api/open_file?path='+
 async function handleOpenExplorer(p){try{const r=await fetch('/api/open_folder?explorer=1&path='+encodeURIComponent(p)),d=await r.json();showToast(d.status==='ok'?'Opening folder...':d.message,d.status==='error')}catch(e){}}
 async function handleOpenFolder(p){try{const r=await fetch('/api/open_folder?path='+encodeURIComponent(p)),d=await r.json();showToast(d.status==='ok'?'Opening folder...':d.message,d.status==='error')}catch(e){}}
 </script>
+<iframe id="_protocolFrame" src="about:blank" style="display:none"></iframe>
 </body>
 </html>
 """
@@ -826,6 +920,7 @@ class PhiHandler(SimpleHTTPRequestHandler):
                 "current_dir":    prog.get("current_dir", ""),
                 "status_message": prog.get("status_message", ""),
                 "phi_count":      get_phi_count(),
+                "summary":        load_phi_summary(),
             })
             return
 
@@ -834,22 +929,26 @@ class PhiHandler(SimpleHTTPRequestHandler):
             return
 
         if parsed.path == "/api/phi_thumbnail":
-            file_path    = params.get("path",     [""])[0]
-            risk         = params.get("risk",     ["NONE"])[0]
-            findings_str = params.get("findings", [""])[0]
-            img_data, ctype = get_phi_thumbnail_bytes(file_path, risk, findings_str)
-            if img_data:
+            file_path = params.get("path", [""])[0]
+            # Proxy to search_app (port 8080) — identical thumbnails, no code duplication
+            try:
+                import urllib.request as _ur
+                encoded = urllib.parse.quote(file_path, safe="")
+                proxy_url = f"http://localhost:8080/api/thumbnail?path={encoded}"
+                with _ur.urlopen(proxy_url, timeout=5) as resp:
+                    img_data = resp.read()
+                    ctype = resp.headers.get("Content-Type", "image/jpeg")
                 try:
                     self.send_response(200)
                     self.send_header("Content-Type", ctype)
-                    self.send_header("Cache-Control", "no-cache")
+                    self.send_header("Cache-Control", "max-age=3600")
                     self.end_headers()
                     self.wfile.write(img_data)
                 except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
                     pass
-                return
-            self.send_response(404)
-            self.end_headers()
+            except Exception:
+                self.send_response(404)
+                self.end_headers()
             return
 
         if parsed.path == "/api/drives":
@@ -990,9 +1089,9 @@ class PhiHandler(SimpleHTTPRequestHandler):
                             <div class="result-header">
                                 <span class="file-title">{fname}</span>
                                 <div class="card-actions">
-                                    <button class="btn-action btn-open-file"     onclick="handleOpenFile('{jp}')">&#8599; Open</button>
-                                    <button class="btn-action btn-open-explorer" onclick="handleOpenExplorer('{jp}')">&#128193; Explorer</button>
-                                    <button class="btn-action btn-open-folder"   onclick="handleOpenFolder('{jp}')">&#128193; Opus</button>
+                                    <button type="button" class="btn-action btn-open-file"     onclick="handleOpenFile('{jp}')">&#8599; Open</button>
+                                    <button type="button" class="btn-action btn-open-explorer" onclick="handleOpenExplorer('{jp}')">&#128193; Explorer</button>
+                                    <button type="button" class="btn-action btn-open-folder"   onclick="handleOpenFolder('{jp}')">&#128193; Opus</button>
                                 </div>
                             </div>
                             <div class="file-path">&#128193; {html.escape(fpath)}</div>
@@ -1005,9 +1104,10 @@ class PhiHandler(SimpleHTTPRequestHandler):
                             </div>
                             <div class="findings-list">{tags or "(no categories)"}</div>
                         </div>
-                        <div class="card-right">
+                        <div class="card-right" style="min-height:200px;">
                             <img src="{tu}" class="thumb-preview" alt="PHI Risk Card"
-                                 onerror="this.parentElement.innerHTML='<div class=\\'thumb-placeholder\\'>No preview</div>'">
+                                 width="300" height="360"
+onerror="this.parentElement.innerHTML='<div class=\\'thumb-placeholder\\'>No preview</div>'">
                         </div>
                     </div>""")
                 results_html = "\n".join(cards)
