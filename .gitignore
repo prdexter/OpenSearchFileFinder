@@ -14,3 +14,9 @@ check_*.py
 test_*.py
 *.log
 scratch/
+# PHI Scanner — local state files (never commit these)
+.cache_phi_thumbnails/
+phi_scan_report.csv
+phi_scanner_progress.json
+phi_scanner_config.json
+sync_audit_report.txt

@@ -972,6 +972,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             </div>
             <div class="header-buttons">
                 <div class="count-badge" id="docCountBadge">📊 Total Indexed: ...</div>
+                <!-- PHI Scanner button — remove this one line + the /api/launch_phi route to fully decouple -->
+                <button type="button" onclick="launchPhi()" style="background:#c0392b;color:white;padding:10px 16px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;">🔐 PHI Scanner</button>
                 <button type="button" class="btn-settings" onclick="openTreeModal()">📁 Index Directories</button>
                 <button type="button" class="btn-index" id="indexBtn" onclick="toggleIndexing()">⚡ Start Indexing</button>
             </div>
@@ -1415,6 +1417,22 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         // Live automatic status & total document count updates every 2 seconds
         setInterval(checkStatus, 2000);
         checkStatus();
+
+        async function launchPhi() {
+            const btn = document.querySelector('[onclick="launchPhi()"]');
+            if (btn) { btn.innerText = '⏳ Starting...'; btn.disabled = true; }
+            try {
+                await fetch('/api/launch_phi');
+                // Give phi_app.py 2 seconds to bind the port, then open
+                setTimeout(() => {
+                    window.open('http://localhost:8081', '_blank');
+                    if (btn) { btn.innerText = '🔐 PHI Scanner'; btn.disabled = false; }
+                }, 2000);
+            } catch(e) {
+                window.open('http://localhost:8081', '_blank');
+                if (btn) { btn.innerText = '🔐 PHI Scanner'; btn.disabled = false; }
+            }
+        }
     </script>
 </body>
 </html>
@@ -1690,6 +1708,25 @@ class SearchHandler(SimpleHTTPRequestHandler):
         if parsed.path == '/api/config':
             cfg = load_config()
             self.send_json(cfg)
+            return
+
+        # API: Launch PHI Scanner (phi_app.py) if not already running
+        if parsed.path == '/api/launch_phi':
+            phi_running = False
+            try:
+                import urllib.request as _ur
+                _ur.urlopen('http://localhost:8081/api/phi_status', timeout=1)
+                phi_running = True
+            except Exception:
+                pass
+            if not phi_running:
+                try:
+                    phi_script = os.path.join(os.path.dirname(__file__), 'phi_app.py')
+                    subprocess.Popen([sys.executable, phi_script], cwd=os.path.dirname(__file__))
+                except Exception as e:
+                    self.send_json({'status': 'error', 'message': str(e)}, 500)
+                    return
+            self.send_json({'status': 'ok', 'running': phi_running})
             return
 
         # Render Main Search HTML

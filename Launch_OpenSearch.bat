@@ -23,6 +23,9 @@ docker compose up -d
 :: 3. Start Smart Search App server in background if not running
 start "SmartSearchApp" /min python search_app.py
 
+:: 3b. Start PHI Scanner app in background
+start "PhiScannerApp" /min python phi_app.py
+
 :: 4. Wait for services to initialize
 ping -n 3 127.0.0.1 >nul
 
