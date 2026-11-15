@@ -13,6 +13,7 @@ Includes:
 import os
 import io
 import re
+import csv
 import html
 import json
 import string
@@ -32,6 +33,7 @@ from http.server import HTTPServer, ThreadingHTTPServer, SimpleHTTPRequestHandle
 from urllib.parse import parse_qs, urlparse
 from datetime import datetime
 from pathlib import Path
+from search_features import location_label, result_snippet
 import psutil
 from opensearchpy import OpenSearch
 from PIL import Image, ImageDraw, ImageFont, ImageStat
@@ -40,6 +42,7 @@ try:
     fitz.TOOLS.mupdf_display_errors(False)
 except Exception:
     pass
+FITZ_LOCK = threading.Lock()
 
 
 def safe_read_bytes(file_path):
@@ -248,6 +251,129 @@ img {{ max-width: 100%; height: auto; display: block; margin: 12px 0; border-rad
         draw.text((50, 165), "(Word Document Preview)", fill='#6c757d')
 
     img.save(cache_path, 'JPEG', quality=90)
+
+
+def generate_fast_csv_cover(file_path, cache_path):
+    """
+    Renders CSV files as a clean Excel-style grid preview card,
+    parsing up to the first 2,000 characters into structured tabular rows.
+    """
+    file_name = os.path.basename(file_path)
+    img = Image.new('RGB', (600, 720), color='#ffffff')
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font_regular = ImageFont.truetype("arial.ttf", 12)
+        font_bold = ImageFont.truetype("arialbd.ttf", 12)
+        font_header = ImageFont.truetype("arialbd.ttf", 13)
+    except Exception:
+        font_regular = font_bold = font_header = ImageFont.load_default()
+
+    # 1. Outer Border & Excel Green Ribbon
+    draw.rectangle([0, 0, 599, 719], outline='#217346', width=2)
+    draw.rectangle([0, 0, 600, 30], fill='#217346')
+    draw.text((15, 7), f"CSV (Excel View)  |  {file_name[:40]}", fill='#ffffff', font=font_header)
+
+    # 2. Formula Bar
+    draw.rectangle([0, 30, 600, 54], fill='#f3f3f3', outline='#d0d0d0')
+    draw.text((12, 35), "fx", fill='#666666', font=font_bold)
+    draw.rectangle([40, 33, 590, 51], fill='#ffffff', outline='#d0d0d0')
+
+    # Read up to 2000 characters and parse via csv.reader
+    rows_data = []
+    try:
+        raw_text = ""
+        for enc in ('utf-8', 'utf-8-sig', 'cp1252', 'latin-1'):
+            try:
+                with open(file_path, 'r', encoding=enc, errors='strict') as f:
+                    raw_text = f.read(2000)
+                break
+            except UnicodeDecodeError:
+                continue
+            except Exception:
+                b = safe_read_bytes(file_path) if 'safe_read_bytes' in globals() else None
+                if b:
+                    try:
+                        raw_text = b[:8000].decode(enc, errors='strict')[:2000]
+                        break
+                    except Exception:
+                        pass
+                break
+        if not raw_text:
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    raw_text = f.read(2000)
+            except Exception:
+                b = safe_read_bytes(file_path) if 'safe_read_bytes' in globals() else None
+                if b:
+                    raw_text = b[:8000].decode('utf-8', errors='ignore')[:2000]
+
+        if raw_text:
+            dialect = csv.excel
+            try:
+                sample_snippet = raw_text[:1024]
+                dialect = csv.Sniffer().sniff(sample_snippet)
+            except Exception:
+                pass
+            reader = csv.reader(io.StringIO(raw_text), dialect)
+            for row in reader:
+                if row:
+                    rows_data.append(row)
+                if len(rows_data) >= 26:
+                    break
+    except Exception:
+        pass
+
+    cols = ['A', 'B', 'C', 'D', 'E', 'F']
+    col_widths = []
+    for c_idx in range(6):
+        max_len = 10
+        for r in rows_data:
+            if c_idx < len(r) and r[c_idx]:
+                v_str = str(r[c_idx]).replace('\xa0', ' ').replace('\ufffd', '•').strip()
+                if len(v_str) > max_len:
+                    max_len = len(v_str)
+        col_widths.append(max(60, min(260, max_len * 7 + 16)))
+
+    # 3. Column Headers (A, B, C, D, E, F)
+    draw.rectangle([0, 54, 600, 76], fill='#e6e6e6', outline='#d0d0d0')
+    draw.text((10, 58), "#", fill='#555555', font=font_bold)
+
+    x = 40
+    for i, col in enumerate(cols):
+        w = col_widths[i]
+        draw.rectangle([x, 54, x + w, 76], fill='#e6e6e6', outline='#c0c0c0')
+        draw.text((x + (w // 2) - 5, 58), col, fill='#333333', font=font_bold)
+        x += w
+
+    # 4. Render Grid Rows
+    y = 76
+    row_h = 24
+    for row_idx in range(1, 26):
+        if y > 700:
+            break
+        draw.rectangle([0, y, 40, y + row_h], fill='#e6e6e6', outline='#c0c0c0')
+        draw.text((10, y + 4), str(row_idx), fill='#555555', font=font_regular)
+
+        row_vals = rows_data[row_idx - 1] if row_idx <= len(rows_data) else []
+
+        x = 40
+        for i in range(6):
+            w = col_widths[i]
+            val_str = ""
+            if i < len(row_vals) and row_vals[i] is not None:
+                val_str = str(row_vals[i]).replace('\xa0', ' ').replace('\ufffd', '•').strip()
+
+            is_header_row = (row_idx == 1)
+            fill_color = '#f8f9fa' if is_header_row else '#ffffff'
+            draw.rectangle([x, y, x + w, y + row_h], fill=fill_color, outline='#e0e0e0')
+            if val_str:
+                use_font = font_bold if is_header_row else font_regular
+                draw.text((x + 6, y + 4), val_str[:32], fill='#111111', font=use_font)
+            x += w
+        y += row_h
+
+    img.save(cache_path, 'JPEG', quality=95)
 
 
 def generate_fast_xlsx_cover(file_path, cache_path):
@@ -594,14 +720,14 @@ def get_thumbnail_bytes(file_path):
     if not os.path.exists(file_path):
         return None, None
 
+    ext = os.path.splitext(file_path)[1].lower().lstrip('.')
     file_hash = get_thumbnail_hash(file_path)
     cache_path = os.path.join(THUMB_CACHE_DIR, f"{file_hash}.jpg")
 
     if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
         try:
             if os.path.getmtime(cache_path) >= os.path.getmtime(file_path):
-                ext_clean = ext.lower()
-                if ext_clean in ('docx', 'doc'):
+                if ext in ('docx', 'doc'):
                     try:
                         with Image.open(cache_path) as img:
                             if img.size == (600, 720) and mammoth is not None and Html2Image is not None:
@@ -613,18 +739,17 @@ def get_thumbnail_bytes(file_path):
         except Exception:
             pass
 
-    ext = os.path.splitext(file_path)[1].lower().lstrip('.')
-
     if ext == 'pdf':
         try:
-            doc = fitz.open(file_path)
-            if len(doc) > 0:
-                page = doc[0]
-                pix = page.get_pixmap(dpi=200)
-                pix.save(cache_path)
-                doc.close()
-                with open(cache_path, 'rb') as f:
-                    return f.read(), "image/jpeg"
+            with FITZ_LOCK:
+                doc = fitz.open(file_path)
+                if len(doc) > 0:
+                    page = doc[0]
+                    pix = page.get_pixmap(dpi=200)
+                    pix.save(cache_path)
+                    doc.close()
+            with open(cache_path, 'rb') as f:
+                return f.read(), 'image/jpeg'
         except Exception:
             pass
 
@@ -659,7 +784,15 @@ def get_thumbnail_bytes(file_path):
             except Exception:
                 pass
 
-    elif ext in ('txt', 'md', 'csv', 'rtf'):
+    elif ext in ('csv', 'tsv'):
+        try:
+            generate_fast_csv_cover(file_path, cache_path)
+            with open(cache_path, 'rb') as f:
+                return f.read(), "image/jpeg"
+        except Exception:
+            pass
+
+    elif ext in ('txt', 'md', 'rtf'):
         try:
             generate_fast_text_cover(file_path, cache_path, ext)
             with open(cache_path, 'rb') as f:
@@ -754,108 +887,9 @@ def list_subdirectories(parent_path: str):
     return subdirs
 
 
-def parse_smart_query(user_query: str, sort_by: str = "relevance", page: int = 1, page_size: int = PAGE_SIZE):
-    raw_query = user_query.strip()
-    raw_query = re.sub(r'NOT\s*\(\s*([^)]+)\s*\)', r' NOT \1 ', raw_query, flags=re.IGNORECASE)
-    
-    tokens = raw_query.split()
-    file_types = []
-    must_terms = []
-    must_not_terms = []
-
-    skip_next = False
-    for i, token in enumerate(tokens):
-        if skip_next:
-            skip_next = False
-            continue
-
-        token_upper = token.upper()
-
-        if token_upper in ('AND', 'OR'):
-            continue
-
-        if token_upper == 'NOT' or token_upper == 'AND NOT':
-            if i + 1 < len(tokens):
-                not_val = tokens[i + 1].strip('()')
-                if not_val:
-                    must_not_terms.append(not_val)
-                skip_next = True
-            continue
-
-        if token.startswith('-') and len(token) > 1:
-            must_not_terms.append(token[1:].strip('()'))
-            continue
-
-        clean_token = token.lower().strip('.,;:\"\'()[]{}')
-        if clean_token in KNOWN_EXTENSIONS:
-            file_types.append(clean_token)
-        else:
-            clean_must = token.strip('.,;:\"\'()[]{}')
-            if clean_must:
-                must_terms.append(clean_must)
-
-    must_conditions = []
-    must_not_conditions = []
-    
-    if file_types:
-        must_conditions.append({"terms": {"file_type": file_types}})
-        
-    if must_terms:
-        for term in must_terms:
-            must_conditions.append({
-                "multi_match": {
-                    "query": term,
-                    "fields": ["content^3", "file_name^5"],
-                    "type": "best_fields"
-                }
-            })
-
-    if must_not_terms:
-        for not_term in must_not_terms:
-            must_not_conditions.append({
-                "multi_match": {
-                    "query": not_term,
-                    "fields": ["content", "file_name", "file_path"]
-                }
-            })
-
-    bool_query = {}
-    if must_conditions:
-        bool_query["must"] = must_conditions
-    if must_not_conditions:
-        bool_query["must_not"] = must_not_conditions
-
-    if not bool_query:
-        query_body = {"query": {"match_all": {}}}
-    else:
-        query_body = {"query": {"bool": bool_query}}
-
-    if sort_by == "date_desc":
-        query_body["sort"] = [{"modified_date": {"order": "desc"}}]
-    elif sort_by == "date_asc":
-        query_body["sort"] = [{"modified_date": {"order": "asc"}}]
-    elif sort_by == "name_asc":
-        query_body["sort"] = [{"file_name.keyword": {"order": "asc"}}]
-    elif sort_by == "size_desc":
-        query_body["sort"] = [{"file_size": {"order": "desc"}}]
-    else:
-        if must_conditions and must_terms:
-            query_body["sort"] = [{"_score": {"order": "desc"}}]
-        else:
-            query_body["sort"] = [{"modified_date": {"order": "desc"}}]
-
-    query_body["highlight"] = {
-        "pre_tags": ["<mark>"],
-        "post_tags": ["</mark>"],
-        "fields": {
-            "content": {"fragment_size": 200, "number_of_fragments": 2}
-        }
-    }
-    
-    # Pagination
-    query_body["from"] = (page - 1) * page_size
-    query_body["size"] = page_size
-    return query_body
+def parse_smart_query(user_query: str, sort_by: str = "relevance", page: int = 1, page_size: int = PAGE_SIZE, **filters):
+    from search_features import build_search_query
+    return build_search_query(user_query, sort_by, page, page_size, **filters)
 
 
 HTML_TEMPLATE = r"""<!DOCTYPE html>
@@ -885,7 +919,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         .btn-index.running:hover { background-color: #c82333; }
         
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
-        input[type="text"] { flex: 1; padding: 14px; font-size: 16px; border: 2px solid #ced4da; border-radius: 6px; }
+        input[type="text"], input[type="search"] { flex: 1; padding: 14px; font-size: 16px; border: 2px solid #ced4da; border-radius: 6px; }
         select { padding: 14px; font-size: 15px; border: 2px solid #ced4da; border-radius: 6px; background: white; cursor: pointer; }
         .btn-search { padding: 14px 28px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .btn-search:hover { background-color: #0056b3; }
@@ -893,7 +927,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         .stats-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .stats { color: #6c757d; font-weight: 500; }
         .toast-notification { position: fixed; bottom: 20px; right: 20px; background: #28a745; color: white; padding: 14px 28px; border-radius: 6px; font-size: 15px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; z-index: 2000; }
-        .index-badge { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; padding: 6px 14px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; animation: indexPulse 1.5s infinite; }
+        .index-badge { padding: 6px 14px; border-radius: 12px; font-size: 13px; font-weight: bold; display: none; }
+        .index-badge.running { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; animation: indexPulse 1.5s infinite; }
+        .index-badge.completed { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; animation: none; }
+        .index-badge.failed { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; animation: none; cursor: help; }
+        .index-badge.stopped { background: #e2e3e5; color: #383d41; border: 1px solid #d6d8db; animation: none; }
         @keyframes indexPulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
         /* Pagination Bar Styles */
@@ -920,6 +958,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         .btn-action { text-decoration: none; padding: 6px 12px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; border: none; }
         .btn-preview { background-color: #fd7e14; color: white; }
         .btn-preview:hover { background-color: #e8590c; color: white; }
+        .btn-copy-path { background-color: #28a745; color: white; }
+        .btn-copy-path:hover { background-color: #1e7e34; color: white; }
         .btn-open-file { background-color: #007bff; color: white; }
         .btn-open-file:hover { background-color: #0056b3; color: white; }
         .btn-open-explorer { background-color: #17a2b8; color: white; }
@@ -963,6 +1003,26 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         .modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; border-top: 1px solid #dee2e6; padding-top: 15px; }
         .btn-save { background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .btn-save:hover { background-color: #218838; }
+
+        .search-panel { background:white; border:1px solid #dee2e6; border-radius:12px; padding:20px; margin-bottom:12px; }
+        .search-panel .search-box { margin:0 0 16px; padding:0; box-shadow:none; border:0; }
+        .search-filters { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+        .search-filters label { display:flex; flex-direction:column; gap:6px; font-size:12px; font-weight:600; color:#495057; }
+        .search-filters input,.search-filters select { padding:9px; border:1px solid #ced4da; border-radius:6px; background:white; min-width:110px; box-sizing:border-box; }
+        .folder-filter { flex:1; min-width:240px; }
+        .search-help,.index-note { font-size:12px; color:#667085; line-height:1.6; margin-top:14px; }
+        .index-note { margin:8px 0 16px; }
+        .clear-filters { padding:10px 2px; font-size:13px; color:#175cd3; }
+        .backup-details { border-top:1px solid #e4e7ec; margin:12px 0 20px; padding-top:12px; color:#667085; font-size:13px; }
+        .backup-details summary { cursor:pointer; font-weight:600; }
+        .backup-details summary span { font-weight:400; margin-left:10px; }
+        .backup-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-top:12px; }
+        .backup-item { padding:12px; background:#f2f4f7; border-radius:6px; overflow-wrap:anywhere; }
+        .backup-item strong { display:block; margin-bottom:6px; }
+        .location-badge { font-size:11px; padding:4px 8px; border-radius:4px; background:#eaf2ff; color:#1849a9; white-space:nowrap; }
+        .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+        @media(max-width:700px) { .search-panel .search-box { flex-wrap:wrap; } .search-panel .search-box input { min-width:100%; box-sizing:border-box; } .search-filters label { flex:1; } .backup-details summary span { display:block; margin:4px 0 0; } }
+        @media(max-width:900px) { .header { flex-direction:column; align-items:flex-start; gap:16px; } .header-buttons { flex-wrap:wrap; } .stats-bar { flex-wrap:wrap; gap:10px; } .result-card { flex-direction:column; } .card-right { width:100%; max-width:300px; } .result-header,.card-actions { flex-wrap:wrap; } .pagination-bar { gap:10px; flex-wrap:wrap; } }
     </style>
 </head>
 <body>
@@ -970,7 +1030,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div class="header">
             <div class="header-title">
                 <h2>🔍 OpenSearch File Finder</h2>
-                <p>Type extension names (e.g. <code>pdf</code>, <code>docx</code>, <code>xlsx</code>, <code>md</code>) and exclusion terms (e.g. <code>quality NOT IUH</code>) directly into the search bar!</p>
+                <p>Find documents by their words, names, project folders, and dates.</p>
             </div>
             <div class="header-buttons">
                 <div class="count-badge" id="docCountBadge">📊 Total Indexed: ...</div>
@@ -981,24 +1041,38 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             </div>
         </div>
 
-        <form class="search-box" method="GET" action="/">
-            <input type="text" name="q" value="{QUERY}" placeholder="Try: 'pdf quality disparities', 'quality NOT IUH', 'xlsx pathology'...">
-            <select name="sort" onchange="this.form.submit()">
-                <option value="relevance" {SORT_RELEVANCE}>Best Match (Relevance)</option>
-                <option value="date_desc" {SORT_DATE_DESC}>Date: Newest First</option>
-                <option value="date_asc" {SORT_DATE_ASC}>Date: Oldest First</option>
-                <option value="name_asc" {SORT_NAME_ASC}>File Name (A - Z)</option>
-                <option value="size_desc" {SORT_SIZE_DESC}>File Size: Largest First</option>
-            </select>
-            <button type="submit" class="btn-search">Search</button>
+        <form class="search-panel" method="GET" action="/" id="documentSearchForm">
+            <div class="search-box">
+                <input aria-label="Search documents" type="search" name="q" value="{QUERY}" placeholder='Search words, "exact phrases", AND / OR / NOT…'>
+                <label class="sr-only" for="searchIn">Search in</label>
+                <select name="search_in" id="searchIn">{SEARCH_IN_OPTIONS}</select>
+                <button type="submit" class="btn-search">Search</button>
+            </div>
+            <div class="search-filters">
+                <label class="folder-filter">Folder or project path<input name="folder" value="{FOLDER}" placeholder="e.g. D:\Active research\EBV"></label>
+                <label>File type<select name="file_type">{FILE_TYPE_OPTIONS}</select></label>
+                <label>Modified from<input type="date" name="modified_from" value="{MODIFIED_FROM}"></label>
+                <label>Through<input type="date" name="modified_to" value="{MODIFIED_TO}"></label>
+                <label>Location<select name="location">{LOCATION_OPTIONS}</select></label>
+                <label>Sort by<select name="sort">
+                    <option value="relevance" {SORT_RELEVANCE}>Best match</option>
+                    <option value="date_desc" {SORT_DATE_DESC}>Newest first</option>
+                    <option value="date_asc" {SORT_DATE_ASC}>Oldest first</option>
+                    <option value="name_asc" {SORT_NAME_ASC}>Name A–Z</option>
+                    <option value="size_desc" {SORT_SIZE_DESC}>Largest first</option>
+                </select></label>
+                <a href="/" class="clear-filters">Reset</a>
+            </div>
+            <div class="search-help">Use <code>"chronic pain" AND intervention NOT pediatric</code> or <code>EBV OR "Epstein Barr"</code>. Leave the search blank to browse with filters. Dates include the full end day.</div>
         </form>
+        <div class="index-note">Searching the existing OpenSearch index. Network results require indexed network paths; this does not scan the NAS.</div>
 
         <div class="stats-bar">
             <div class="stats">{STATS}</div>
             <div class="index-badge" id="indexStatusBadge">⏳ Indexing active in background...</div>
         </div>
 
-        <div id="sanSummaryContainer" style="display:none; margin: 15px 0;"></div>
+        <details class="backup-details"><summary>Backup details <span>Latest recorded run · not live NAS verification</span></summary><div id="sanSummaryContainer"></div></details>
 
         {PAGINATION_TOP}
 
@@ -1105,11 +1179,32 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                     const response = await fetch(rawUrl);
                     const arrayBuffer = await response.arrayBuffer();
                     if (window.XLSX) {
+                        const MAX_ROWS = 2000;
                         const workbook = XLSX.read(arrayBuffer, {type: 'array'});
                         const firstSheetName = workbook.SheetNames[0];
                         const worksheet = workbook.Sheets[firstSheetName];
-                        const htmlTable = XLSX.utils.sheet_to_html(worksheet);
-                        container.innerHTML = '<div style="background:white; padding:25px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); overflow:auto; max-height:100%;"><h4 style="margin-top:0; color:#28a745;">📊 Sheet: ' + firstSheetName + '</h4><style>table { border-collapse: collapse; width:100%; font-size:14px; } td, th { border: 1px solid #dee2e6; padding: 8px 12px; } tr:nth-child(even) { background-color: #f8f9fa; } tr:first-child { background-color: #e9ecef; font-weight: bold; }</style>' + htmlTable + '</div>';
+
+                        // Determine actual row count from sheet ref
+                        const ref = worksheet['!ref'];
+                        let truncated = false;
+                        let wsToRender = worksheet;
+                        if (ref) {
+                            const range = XLSX.utils.decode_range(ref);
+                            const totalRows = range.e.r + 1; // 0-indexed end row
+                            if (totalRows > MAX_ROWS) {
+                                truncated = true;
+                                // Clamp the sheet ref to MAX_ROWS rows
+                                const newRange = { s: range.s, e: { r: MAX_ROWS - 1, c: range.e.c } };
+                                wsToRender = Object.assign({}, worksheet);
+                                wsToRender['!ref'] = XLSX.utils.encode_range(newRange);
+                            }
+                        }
+
+                        const htmlTable = XLSX.utils.sheet_to_html(wsToRender);
+                        const truncBanner = truncated
+                            ? '<div style="background:#fff3cd; color:#856404; border:1px solid #ffc107; border-radius:5px; padding:8px 14px; margin-bottom:12px; font-size:13px;">⚠️ Large file — showing first ' + MAX_ROWS.toLocaleString() + ' rows. Use <b>Open File</b> to view the full document.</div>'
+                            : '';
+                        container.innerHTML = '<div style="background:white; padding:25px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1); overflow:auto; max-height:100%;"><h4 style="margin-top:0; color:#28a745;">📊 Sheet: ' + firstSheetName + '</h4>' + truncBanner + '<style>table { border-collapse: collapse; width:100%; font-size:14px; } td, th { border: 1px solid #dee2e6; padding: 8px 12px; } tr:nth-child(even) { background-color: #f8f9fa; } tr:first-child { background-color: #e9ecef; font-weight: bold; }</style>' + htmlTable + '</div>';
                     } else {
                         container.innerHTML = '<div style="color:red; padding:20px;">SheetJS library not loaded</div>';
                     }
@@ -1143,6 +1238,23 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 document.body.appendChild(a); a.click();
                 setTimeout(()=>document.body.removeChild(a), 500);
             }
+        }
+
+        function copyPath(filePath) {
+            navigator.clipboard.writeText(filePath).then(() => {
+                showToast('📋 Path copied to clipboard!');
+            }).catch(() => {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = filePath;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast('📋 Path copied to clipboard!');
+            });
         }
 
         async function handleOpenFile(filePath, customUrl) {
@@ -1210,7 +1322,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                     if (isIndexing) {
                         btn.className = 'btn-index running';
                         btn.innerText = '⏹️ Stop Indexing';
+                        badge.className = 'index-badge running';
                         badge.style.display = 'inline-block';
+                        badge.title = '';
                         
                         if (data.status_message) {
                             const msg = data.status_message;
@@ -1221,24 +1335,43 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                     } else {
                         btn.className = 'btn-index';
                         btn.innerText = '⚡ Start Indexing';
-                        badge.style.display = 'none';
+                        if (data.status_message) {
+                            badge.style.display = 'inline-block';
+                            badge.innerText = data.status_message;
+                            if (data.status === 'completed') {
+                                badge.className = 'index-badge completed';
+                                badge.title = 'Indexing finished successfully';
+                            } else if (data.status === 'failed' || data.status_message.startsWith('❌') || data.status_message.startsWith('⚠️')) {
+                                badge.className = 'index-badge failed';
+                                badge.title = data.error_details || 'Indexing process exited with an error';
+                            } else if (data.status === 'stopped' || data.status_message.startsWith('⏹️')) {
+                                badge.className = 'index-badge stopped';
+                                badge.title = 'Indexing was stopped by user';
+                            } else {
+                                badge.className = 'index-badge stopped';
+                                badge.title = '';
+                            }
+                        } else {
+                            badge.style.display = 'none';
+                        }
                     }
                 }
 
                 const sanContainer = document.getElementById('sanSummaryContainer');
                 if (data.san_summary && sanContainer) {
-                    let html = '<div class="san-summary-box">';
-                    html += '<div class="san-summary-header">💾 SAN Backup Recent File Changes Summary</div>';
-                    html += '<div class="san-grid">';
-                    for (const [cat, info] of Object.entries(data.san_summary)) {
-                        html += '<div class="san-card">';
-                        html += '<div class="san-card-title">📂 ' + cat + '</div>';
-                        html += '<div class="san-card-file" title="' + (info.latest_path || '') + '">📄 ' + (info.latest_file || 'None') + '</div>';
-                        html += '<div class="san-card-time">🕒 Modified: ' + (info.latest_time || 'N/A') + '</div>';
-                        html += '</div>';
+                    const list = document.createElement('div');
+                    list.className = 'backup-list';
+                    for (const [category, info] of Object.entries(data.san_summary)) {
+                        const item = document.createElement('div');
+                        item.className = 'backup-item';
+                        const title = document.createElement('strong');
+                        title.textContent = category;
+                        const target = document.createElement('div');
+                        target.textContent = info.target || 'Destination not recorded';
+                        item.append(title, target);
+                        list.append(item);
                     }
-                    html += '</div></div>';
-                    sanContainer.innerHTML = html;
+                    sanContainer.replaceChildren(list);
                     sanContainer.style.display = 'block';
                 }
             } catch (e) {}
@@ -1445,6 +1578,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         setInterval(checkStatus, 2000);
         checkStatus();
 
+        // Immediately refresh status as soon as user returns to tab
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                checkStatus();
+            }
+        });
+
         async function launchPhi() {
             const btn = document.querySelector('[onclick="launchPhi()"]');
             if (btn) { btn.innerText = '⏳ Starting...'; btn.disabled = true; }
@@ -1466,8 +1606,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 """
 
 
+INDEXER_STOP_REQUESTED = False
+INDEXER_RUN_LOG = os.path.join(os.path.dirname(__file__), "indexer_run.log")
+
+
 def stop_all_indexer_processes():
-    global INDEXER_PROCESS
+    global INDEXER_PROCESS, INDEXER_STOP_REQUESTED
+    INDEXER_STOP_REQUESTED = True
     if INDEXER_PROCESS and INDEXER_PROCESS.poll() is None:
         try:
             INDEXER_PROCESS.terminate()
@@ -1513,7 +1658,10 @@ def stop_all_indexer_processes():
             with open(prog_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             data["is_running"] = False
-            data["status_message"] = ""
+            scanned = data.get("scanned", 0)
+            indexed = data.get("indexed", 0)
+            data["status"] = "stopped"
+            data["status_message"] = f"⏹️ Indexing stopped by user ({scanned:,} scanned, {indexed:,} updated)"
             with open(prog_file, "w", encoding="utf-8") as f:
                 json.dump(data, f)
         except Exception:
@@ -1702,13 +1850,15 @@ class SearchHandler(SimpleHTTPRequestHandler):
                     pass
                     
             msg = progress.get("status_message", "")
-            if not is_running:
-                msg = ""
-            elif is_running and not msg:
-                msg = "Indexing active in background..."
+            raw_status = progress.get("status", "running" if is_running else "idle")
+            error_details = progress.get("error_details", "")
+            if is_running and not msg:
+                msg = "⚡ Indexing active in background..."
 
             self.send_json({
                 "indexing_running": is_running,
+                "status": "running" if is_running else raw_status,
+                "error_details": error_details,
                 "total_docs": total_count,
                 "scanned": progress.get("scanned", 0),
                 "indexed": progress.get("indexed", 0),
@@ -1758,7 +1908,10 @@ class SearchHandler(SimpleHTTPRequestHandler):
 
         # Render Main Search HTML
         query_str = params.get('q', [''])[0].strip()
-        sort_by = params.get('sort', ['date_desc'])[0].strip()
+        sort_by = params.get('sort', ['relevance'])[0].strip()
+        filters = {key: params.get(key, [''])[0].strip() for key in ('folder', 'file_type', 'modified_from', 'modified_to')}
+        filters['search_in'] = params.get('search_in', ['both'])[0]
+        filters['location'] = params.get('location', ['all'])[0]
         
         try:
             page = int(params.get('page', ['1'])[0])
@@ -1768,7 +1921,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
             page = 1
 
         cfg = load_config()
-        selected_json = json.dumps(cfg.get('selected_directories', []))
+        selected_json = json.dumps(cfg.get('selected_directories', [])).replace("</", "<\\/")
 
         stats_html = ""
         results_html = ""
@@ -1782,9 +1935,15 @@ class SearchHandler(SimpleHTTPRequestHandler):
             "SORT_SIZE_DESC": "selected" if sort_by == "size_desc" else ""
         }
 
-        if query_str:
+        query_error = None
+        es_query = None
+        if params:
+            try:
+                es_query = parse_smart_query(query_str, sort_by=sort_by, page=page, page_size=PAGE_SIZE, **filters)
+            except ValueError as error:
+                query_error = str(error)
+        if es_query is not None:
             client = get_client()
-            es_query = parse_smart_query(query_str, sort_by=sort_by, page=page, page_size=PAGE_SIZE)
             res = None
             last_err = None
             for attempt in range(3):
@@ -1810,13 +1969,14 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 if total > 0:
                     prev_disabled = "disabled" if page <= 1 else ""
                     prev_page = page - 1 if page > 1 else 1
-                    prev_url = f"/?q={urllib.parse.quote(query_str)}&sort={sort_by}&page={prev_page}"
+                    search_params = dict(q=query_str, sort=sort_by, **filters)
+                    prev_url = html.escape('/?' + urllib.parse.urlencode(dict(search_params, page=prev_page)), quote=True)
 
                     next_disabled = "disabled" if end_doc >= total else ""
                     next_page = page + 1 if end_doc < total else page
                     next_count = min(PAGE_SIZE, total - end_doc)
                     next_label = f"Next {next_count} of {total:,} ➡️" if next_count > 0 else "Next ➡️"
-                    next_url = f"/?q={urllib.parse.quote(query_str)}&sort={sort_by}&page={next_page}"
+                    next_url = html.escape('/?' + urllib.parse.urlencode(dict(search_params, page=next_page)), quote=True)
 
                     pagination_html = f"""
                     <div class="pagination-bar">
@@ -1827,12 +1987,14 @@ class SearchHandler(SimpleHTTPRequestHandler):
                     """
 
                 if not hits:
-                    results_html = "<div class='result-card'>No matching documents found.</div>"
+                    empty_message = "No matching indexed network documents. This search does not inspect the NAS." if filters['location'] == 'network' else "No matching documents found."
+                    results_html = "<div class='result-card'>" + empty_message + "</div>"
                 else:
                     cards = []
                     for hit in hits:
                         src = hit['_source']
                         fname = html.escape(src.get('file_name', 'Unnamed File'))
+                        display_name = hit.get('highlight', {}).get('file_name', [fname])[0]
                         fpath = src.get('file_path', '')
                         
                         # Generate direct Windows Custom Protocol URLs & escaped JS paths
@@ -1854,7 +2016,7 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         else:
                             mtime_ver = 2
 
-                        thumb_url = f"/api/thumbnail?path={encoded_path}&v={mtime_ver}"
+                        thumb_url = f"/api/thumbnail?path={encoded_path}&v=excel3_{mtime_ver}"
 
                         mod_str = format_doc_date(mod_val)
                         create_str = format_doc_date(create_val)
@@ -1867,11 +2029,8 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         
                         dates_html = f'<div class="file-meta-dates">{" &bull; ".join(date_parts)}</div>' if date_parts else ''
 
-                        highlights = hit.get('highlight', {}).get('content', [])
-                        if highlights:
-                            snippet_text = " ... ".join(highlights)
-                        else:
-                            snippet_text = (src.get('content', '')[:300] + "...") if src.get('content') else "No preview text available."
+                        snippet_text = result_snippet(hit)
+                        source_label = location_label(fpath)
 
                         # Render Right Column Visual Cover Preview Card for ALL Document Types
                         thumb_html = f"""
@@ -1884,13 +2043,15 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         <div class="result-card">
                             <div class="card-left">
                                 <div class="result-header">
-                                    <a class="file-title" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}', '{ftype}')" title="Click to view live full document preview in browser">{fname}</a>
+                                    <a class="file-title" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}', '{ftype}')" title="Click to view live full document preview in browser">{display_name}</a>
                                     <div class="card-actions">
                                         <button type="button" class="btn-action btn-preview" onclick="openDocViewer('{escaped_js_path}', '{escaped_title}', '{ftype}')">👁️ Preview</button>
+                                        <button type="button" class="btn-action btn-copy-path" onclick="copyPath('{escaped_js_path}')">📋 Copy Path</button>
                                         <button type="button" class="btn-action btn-open-file" onclick="handleOpenFile('{escaped_js_path}', '{open_file_url}')">↗️ Open File</button>
                                         <button type="button" class="btn-action btn-open-explorer" onclick="handleOpenExplorer('{escaped_js_path}', '{open_explorer_url}')">📁 Explorer</button>
                                         <button type="button" class="btn-action btn-open-folder" onclick="handleOpenFolder('{escaped_js_path}', '{open_opus_url}')">📁 Opus</button>
-                                        <span class="badge">{ftype}</span>
+                                        <span class="badge">{html.escape(ftype)}</span>
+                                        <span class="location-badge">{source_label}</span>
                                     </div>
                                 </div>
                                 <div class="file-path" onclick="handleOpenExplorer('{escaped_js_path}', '{open_explorer_url}')" title="Click to open folder in Windows File Explorer">📁 {escaped_display_path}</div>
@@ -1914,11 +2075,26 @@ class SearchHandler(SimpleHTTPRequestHandler):
                 else:
                     results_html = f"<div class='result-card' style='color:red;'>Error executing search: {html.escape(err_msg)}</div>"
 
-        html_out = HTML_TEMPLATE.replace("{QUERY}", query_str).replace("{STATS}", stats_html).replace("{RESULTS}", results_html).replace("{SELECTED_JSON}", selected_json)
+        if query_error:
+            results_html = '<div class="result-card" role="alert">' + html.escape(query_error) + '</div>'
+        elif not params:
+            results_html = '<div class="result-card">Search your indexed documents, or choose filters and press Search to browse.</div>'
+        html_out = HTML_TEMPLATE.replace("{QUERY}", html.escape(query_str, quote=True)).replace("{STATS}", stats_html).replace("{RESULTS}", results_html).replace("{SELECTED_JSON}", selected_json)
         html_out = html_out.replace("{PAGINATION_TOP}", pagination_html).replace("{PAGINATION_BOTTOM}", pagination_html)
         
         for key, val in sort_state.items():
             html_out = html_out.replace(f"{{{key}}}", val)
+
+        def options(items, selected):
+            return ''.join('<option value="' + html.escape(value, quote=True) + '"' + (' selected' if value == selected else '') + '>' + html.escape(label) + '</option>' for value, label in items)
+        filter_markup = {
+            'SEARCH_IN_OPTIONS': options([('both', 'Contents + filename'), ('contents', 'Contents only'), ('filename', 'Filename only')], filters['search_in']),
+            'LOCATION_OPTIONS': options([('all', 'All indexed locations'), ('local', 'Local files'), ('network', 'NAS / network files')], filters['location']),
+            'FILE_TYPE_OPTIONS': options([('', 'All file types'), ('doc,docx,odt,rtf', 'Word / text documents'), ('pdf', 'PDF'), ('xls,xlsx,csv', 'Spreadsheets'), ('ppt,pptx', 'Presentations')] + [(ext, ext.upper()) for ext in sorted(KNOWN_EXTENSIONS)], filters['file_type']),
+            **{key.upper(): html.escape(value, quote=True) for key, value in filters.items() if key in ('folder', 'modified_from', 'modified_to')},
+        }
+        for key, value in filter_markup.items():
+            html_out = html_out.replace('{' + key + '}', value)
 
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -1969,13 +2145,58 @@ class SearchHandler(SimpleHTTPRequestHandler):
                         pass
 
                     def run_ingest():
-                        global INDEXER_PROCESS
+                        global INDEXER_PROCESS, INDEXER_STOP_REQUESTED
+                        INDEXER_STOP_REQUESTED = False
+                        ret_code = None
                         try:
-                            cmd = [sys.executable, "ingest_documents.py", "--dir"] + dirs
-                            INDEXER_PROCESS = subprocess.Popen(cmd, cwd=os.path.dirname(__file__))
-                            INDEXER_PROCESS.wait()
+                            cmd = [sys.executable, "-u", "ingest_documents.py", "--dir"] + dirs
+                            with open(INDEXER_RUN_LOG, "w", encoding="utf-8") as log_f:
+                                INDEXER_PROCESS = subprocess.Popen(
+                                    cmd,
+                                    cwd=os.path.dirname(__file__),
+                                    stdout=log_f,
+                                    stderr=subprocess.STDOUT
+                                )
+                                ret_code = INDEXER_PROCESS.wait()
+                        except Exception as e:
+                            ret_code = -1
                         finally:
                             INDEXER_PROCESS = None
+                            try:
+                                prog_file = os.path.join(os.path.dirname(__file__), "indexer_progress.json")
+                                curr_data = {}
+                                if os.path.exists(prog_file):
+                                    with open(prog_file, "r", encoding="utf-8") as f:
+                                        curr_data = json.load(f)
+
+                                scanned = curr_data.get("scanned", 0)
+                                indexed = curr_data.get("indexed", 0)
+
+                                if INDEXER_STOP_REQUESTED:
+                                    curr_data["is_running"] = False
+                                    curr_data["status"] = "stopped"
+                                    curr_data["status_message"] = f"⏹️ Indexing stopped by user ({scanned:,} scanned, {indexed:,} updated)"
+                                elif ret_code == 0 and curr_data.get("status") == "completed":
+                                    curr_data["is_running"] = False
+                                else:
+                                    err_detail = ""
+                                    if os.path.exists(INDEXER_RUN_LOG):
+                                        try:
+                                            with open(INDEXER_RUN_LOG, "r", encoding="utf-8", errors="ignore") as f:
+                                                lines = [l.strip() for l in f.readlines() if l.strip()]
+                                                err_detail = " | ".join(lines[-3:]) if lines else f"Process exited with code {ret_code}"
+                                        except Exception:
+                                            pass
+                                    curr_data["is_running"] = False
+                                    curr_data["status"] = "failed"
+                                    if not curr_data.get("error_details"):
+                                        curr_data["status_message"] = f"❌ Indexing/backup did not complete successfully (exit code {ret_code}): {err_detail[:120]}"
+                                        curr_data["error_details"] = err_detail
+
+                                with open(prog_file, "w", encoding="utf-8") as f:
+                                    json.dump(curr_data, f)
+                            except Exception:
+                                pass
 
                     t = threading.Thread(target=run_ingest)
                     t.daemon = True

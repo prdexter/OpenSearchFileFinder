@@ -8,9 +8,9 @@ A high-performance, 100% open-source local document search engine and web finder
 
 - **🚀 High-Throughput Multithreaded Ingestion:** Multi-worker directory scanner (`ingest_documents.py`) extracting text from PDFs, Word docs (`.docx`), Excel spreadsheets (`.xlsx`), Text, Markdown (`.md`), and PowerPoint files with SHA-256 deduplication.
 - **⚡ Sub-Second Search Response:** Sub-50ms query response times even across millions of documents.
-- **🧠 Smart Query Parsing:** Automatically parses 1-word extension queries (`pdf`, `docx`, `xlsx`, `md`) as file type filters without requiring complex syntax or quotes (`pdf patient` ➔ `file_type: pdf AND content: patient`).
+- **Search controls:** Search contents, filenames, or both; use exact phrases, `AND`, `OR`, `NOT`, and parentheses. Filter by folder, file type, modified dates, and indexed local/network paths.
 - **↕️ Custom Sorting Options:** Sort search results instantly by Relevance (Best Match), Date (Newest/Oldest), File Name (A-Z), or File Size (Largest First).
-- **🔒 100% Local & PHI Compliant:** All data processing, indexing, and UI servers run strictly locally inside Docker containers. Zero data is sent to external clouds.
+- **Local indexing and search:** OpenSearch and the Python apps run locally. Review deployment security and data-handling requirements before using sensitive documents; the browser previews load some JavaScript libraries from public CDNs.
 - **🛡️ Memory Optimized:** Includes pre-configured WSL2 ceiling settings (`memory=6GB`) to prevent host RAM exhaustion and system UI freezes.
 
 ---
@@ -42,8 +42,8 @@ OpenSearch/
 
 ### 1. Clone & Install Dependencies
 ```bash
-git clone https://github.com/your-username/opensearch-file-finder.git
-cd opensearch-file-finder
+git clone https://github.com/prdexter/OpenSearchFileFinder.git
+cd OpenSearchFileFinder
 pip install -r requirements.txt
 ```
 
@@ -55,7 +55,7 @@ docker compose up -d
 ### 3. Ingest Documents
 Run the ingestion pipeline on your target directories:
 ```bash
-python ingest_documents.py --dir "C:\Users\YourName\Documents" "D:\Research" --threads 8
+python ingest_documents.py --dir "C:\Users\YourName\Documents" "D:\Research"
 ```
 
 ### 4. Launch Smart Search Finder
@@ -77,6 +77,26 @@ Run `Launch_OpenSearch.bat` or use the generated desktop shortcut to:
 
 ---
 
+## Local configuration and backups
+
+Copy `indexer_config.example.json` to `indexer_config.json` and adjust the directories and backup destinations for your machine. The app also saves these settings through its directory configuration dialog. Local configuration, reports, thumbnail caches, and progress files are excluded from Git.
+
+Search uses the existing `documents` index; changing the search interface does not rebuild it. Network filters only match indexed network paths and do not scan NAS backups.
+
+Backup errors propagate to the final app status. Windows permission repair can be installed once with `install_backup_permission_helper.ps1` in Administrator PowerShell. The helper is configured for the original workstation/account and restricts repairs to `D:\Active research`; review and adapt those settings before installing on another computer. It runs on demand while that account is signed in. `retry_active_research_backup.py` retries that configured mirror and then performs a read-only comparison.
+
+`run_overnight_maintenance.py` and `Run_Overnight_Maintenance.bat` perform ingestion and thumbnail maintenance. The `allfields*.py` scripts are local PHI field-review utilities; review their input/output paths before running them.
+
+## Tests
+
+On Windows, from the project directory:
+
+```powershell
+python -m unittest discover -s tests -p '*_test.py' -v
+```
+
+The suite includes small temporary-file Robocopy and permission-helper tests. It does not run production ingestion or NAS backups. Keep the separately backed-up source documents and OpenSearch Docker data volume when restoring the app; this Git repository contains code, not the search database or document backups.
+
 ## 📄 License
 
-Distributed under the **Apache 2.0 License**. See [`LICENSE`](file:///D:/Active%20research/OpenSearch/LICENSE) for details.
+Distributed under the **Apache 2.0 License**. See [`LICENSE`](LICENSE) for details.

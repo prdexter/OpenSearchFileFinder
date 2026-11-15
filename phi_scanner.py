@@ -53,6 +53,8 @@ try:
     import openpyxl
     from docx import Document
     import fitz           # PyMuPDF
+    import threading
+    FITZ_LOCK = threading.Lock()
     import xlrd           # legacy .xls
 except ImportError as e:
     print("\nMissing required Python package.")
@@ -239,7 +241,14 @@ HIGH_RISK_HEADERS = {
     "mrn", "medical record number", "medical record #",
     "patient name", "patient_name", "patientname",
     "date of birth", "birth date", "dob", "birthdate",
-    "social security number", "ssn", "social security",
+    # SSN variants
+    "ssn", "ss#", "ssn#",
+    "social security", "social security number", "social security no",
+    "social security no.", "social security #",
+    "social_security", "social_security_number", "social_security_no",
+    "socialsecurity", "socialsecuritynumber",
+    "soc sec", "soc. sec", "soc. sec.", "soc sec no",
+    "social sec", "social sec number",
     "npi", "national provider id",
     "dea", "dea number",
 }
@@ -249,6 +258,7 @@ HIGH_RISK_HEADERS = {
 HEADER_PHI_SUBSTRINGS = {
     "name",      # first_name, last_name, patient_name, provider_name, etc.
     "mrn",       # any field containing MRN
+    "ssn",       # patient_ssn, ssn_number, ssn#, etc.
     "date",      # encounter_date, visit_date, dob, dod, order_date, etc.
     "dob",       # date_of_birth, dob_year, etc.
     "dod",       # date_of_death, dod, etc.
@@ -516,24 +526,25 @@ def scan_excel_xls(path):
 
 
 def scan_pdf(path):
-    findings = Counter()
-    pdf = fitz.open(str(path))
-    total_chars = 0
-    pages_with_text = 0
-    try:
-        for page in pdf:
-            text = page.get_text("text")
-            if text and text.strip():
-                pages_with_text += 1
-                merge_findings(findings, analyze_text(text))
-                total_chars += len(text)
-            if total_chars >= MAX_TEXT_CHARS:
-                break
-        if len(pdf) > 0 and pages_with_text == 0:
-            return findings, "PDF HAS NO EXTRACTABLE TEXT - OCR NEEDED"
-    finally:
-        pdf.close()
-    return findings, None
+    with FITZ_LOCK:
+        findings = Counter()
+        pdf = fitz.open(str(path))
+        total_chars = 0
+        pages_with_text = 0
+        try:
+            for page in pdf:
+                text = page.get_text("text")
+                if text and text.strip():
+                    pages_with_text += 1
+                    merge_findings(findings, analyze_text(text))
+                    total_chars += len(text)
+                if total_chars >= MAX_TEXT_CHARS:
+                    break
+            if len(pdf) > 0 and pages_with_text == 0:
+                return findings, "PDF HAS NO EXTRACTABLE TEXT - OCR NEEDED"
+        finally:
+            pdf.close()
+        return findings, None
 
 
 def scan_json(path):

@@ -34,6 +34,8 @@ import math
 import time
 import string
 import hashlib
+import tempfile
+import ctypes
 import threading
 import subprocess
 import urllib.parse
@@ -289,14 +291,174 @@ def generate_phi_thumbnail(file_path, risk, findings_str, cache_path):
     img.save(cache_path, "JPEG", quality=92)
 
 
-def get_phi_thumbnail_bytes(file_path, risk, findings_str):
-    thumb_hash = get_phi_thumb_hash(file_path)
-    cache_path = os.path.join(PHI_THUMB_DIR, f"{thumb_hash}.jpg")
-    if not os.path.exists(cache_path):
+def safe_read_bytes(file_path):
+    if not os.path.exists(file_path):
+        return None
+    try:
+        with open(file_path, 'rb') as f:
+            return f.read()
+    except PermissionError:
+        tmp_dir = tempfile.gettempdir()
+        tmp_name = f"opensearch_phi_lock_{os.getpid()}_{os.path.basename(file_path)}"
+        tmp_path = os.path.join(tmp_dir, tmp_name)
         try:
-            generate_phi_thumbnail(file_path, risk, findings_str, cache_path)
+            res = ctypes.windll.kernel32.CopyFileW(file_path, tmp_path, False)
+            if res != 0:
+                with open(tmp_path, 'rb') as f:
+                    data = f.read()
+                return data
         except Exception:
             pass
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return None
+
+
+def generate_fast_csv_cover(file_path, cache_path):
+    """
+    Renders CSV files as a clean Excel-style grid preview card,
+    parsing up to the first 2,000 characters into structured tabular rows.
+    Stored strictly in .cache_phi_thumbnails for PHI documents.
+    """
+    file_name = os.path.basename(file_path)
+    img = Image.new('RGB', (600, 720), color='#ffffff')
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font_regular = ImageFont.truetype("arial.ttf", 12)
+        font_bold = ImageFont.truetype("arialbd.ttf", 12)
+        font_header = ImageFont.truetype("arialbd.ttf", 13)
+    except Exception:
+        font_regular = font_bold = font_header = ImageFont.load_default()
+
+    # 1. Outer Border & Excel Green Ribbon
+    draw.rectangle([0, 0, 599, 719], outline='#217346', width=2)
+    draw.rectangle([0, 0, 600, 30], fill='#217346')
+    draw.text((15, 7), f"CSV (Excel View)  |  {file_name[:40]}", fill='#ffffff', font=font_header)
+
+    # 2. Formula Bar
+    draw.rectangle([0, 30, 600, 54], fill='#f3f3f3', outline='#d0d0d0')
+    draw.text((12, 35), "fx", fill='#666666', font=font_bold)
+    draw.rectangle([40, 33, 590, 51], fill='#ffffff', outline='#d0d0d0')
+
+    # Read up to 2000 characters and parse via csv.reader
+    rows_data = []
+    try:
+        raw_text = ""
+        for enc in ('utf-8', 'utf-8-sig', 'cp1252', 'latin-1'):
+            try:
+                with open(file_path, 'r', encoding=enc, errors='strict') as f:
+                    raw_text = f.read(2000)
+                break
+            except UnicodeDecodeError:
+                continue
+            except Exception:
+                b = safe_read_bytes(file_path) if 'safe_read_bytes' in globals() else None
+                if b:
+                    try:
+                        raw_text = b[:8000].decode(enc, errors='strict')[:2000]
+                        break
+                    except Exception:
+                        pass
+                break
+        if not raw_text:
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    raw_text = f.read(2000)
+            except Exception:
+                b = safe_read_bytes(file_path) if 'safe_read_bytes' in globals() else None
+                if b:
+                    raw_text = b[:8000].decode('utf-8', errors='ignore')[:2000]
+
+        if raw_text:
+            dialect = csv.excel
+            try:
+                sample_snippet = raw_text[:1024]
+                dialect = csv.Sniffer().sniff(sample_snippet)
+            except Exception:
+                pass
+            reader = csv.reader(io.StringIO(raw_text), dialect)
+            for row in reader:
+                if row:
+                    rows_data.append(row)
+                if len(rows_data) >= 26:
+                    break
+    except Exception:
+        pass
+
+    cols = ['A', 'B', 'C', 'D', 'E', 'F']
+    col_widths = []
+    for c_idx in range(6):
+        max_len = 10
+        for r in rows_data:
+            if c_idx < len(r) and r[c_idx]:
+                v_str = str(r[c_idx]).replace('\xa0', ' ').replace('\ufffd', '•').strip()
+                if len(v_str) > max_len:
+                    max_len = len(v_str)
+        col_widths.append(max(60, min(260, max_len * 7 + 16)))
+
+    # 3. Column Headers (A, B, C, D, E, F)
+    draw.rectangle([0, 54, 600, 76], fill='#e6e6e6', outline='#d0d0d0')
+    draw.text((10, 58), "#", fill='#555555', font=font_bold)
+
+    x = 40
+    for i, col in enumerate(cols):
+        w = col_widths[i]
+        draw.rectangle([x, 54, x + w, 76], fill='#e6e6e6', outline='#c0c0c0')
+        draw.text((x + (w // 2) - 5, 58), col, fill='#333333', font=font_bold)
+        x += w
+
+    # 4. Render Grid Rows
+    y = 76
+    row_h = 24
+    for row_idx in range(1, 26):
+        if y > 700:
+            break
+        draw.rectangle([0, y, 40, y + row_h], fill='#e6e6e6', outline='#c0c0c0')
+        draw.text((10, y + 4), str(row_idx), fill='#555555', font=font_regular)
+
+        row_vals = rows_data[row_idx - 1] if row_idx <= len(rows_data) else []
+
+        x = 40
+        for i in range(6):
+            w = col_widths[i]
+            val_str = ""
+            if i < len(row_vals) and row_vals[i] is not None:
+                val_str = str(row_vals[i]).replace('\xa0', ' ').replace('\ufffd', '•').strip()
+
+            is_header_row = (row_idx == 1)
+            fill_color = '#f8f9fa' if is_header_row else '#ffffff'
+            draw.rectangle([x, y, x + w, y + row_h], fill=fill_color, outline='#e0e0e0')
+            if val_str:
+                use_font = font_bold if is_header_row else font_regular
+                draw.text((x + 6, y + 4), val_str[:32], fill='#111111', font=use_font)
+            x += w
+        y += row_h
+
+    img.save(cache_path, 'JPEG', quality=95)
+
+
+def get_phi_thumbnail_bytes(file_path, risk="", findings_str=""):
+    ext = os.path.splitext(file_path)[1].lower().lstrip(".")
+    thumb_hash = get_phi_thumb_hash(file_path)
+    cache_path = os.path.join(PHI_THUMB_DIR, f"{thumb_hash}.jpg")
+    if not os.path.exists(cache_path) or os.path.getsize(cache_path) == 0:
+        if ext in ("csv", "tsv"):
+            try:
+                generate_fast_csv_cover(file_path, cache_path)
+            except Exception:
+                pass
+        else:
+            try:
+                generate_phi_thumbnail(file_path, risk, findings_str, cache_path)
+            except Exception:
+                pass
     if os.path.exists(cache_path):
         try:
             with open(cache_path, "rb") as f:
@@ -409,8 +571,12 @@ def ingest_phi_report(report_path):
                 if risk != "NONE" and os.path.exists(file_path):
                     cache_path = os.path.join(PHI_THUMB_DIR, f"{get_phi_thumb_hash(file_path)}.jpg")
                     if not os.path.exists(cache_path):
+                        ext_c = os.path.splitext(file_path)[1].lower().lstrip(".")
                         try:
-                            generate_phi_thumbnail(file_path, risk, findings, cache_path)
+                            if ext_c in ("csv", "tsv"):
+                                generate_fast_csv_cover(file_path, cache_path)
+                            else:
+                                generate_phi_thumbnail(file_path, risk, findings, cache_path)
                         except Exception:
                             pass
 
@@ -624,6 +790,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .risk-medium{background:#ffeeba;color:#856404}
         .risk-low{background:#fff3cd;color:#664d03}
         .btn-action{text-decoration:none;padding:6px 12px;border-radius:5px;font-size:12px;font-weight:bold;cursor:pointer;display:inline-flex;align-items:center;gap:4px;border:none}
+        .btn-copy-path{background:#28a745;color:white}
+        .btn-copy-path:hover{background:#1e7e34;color:white}
         .btn-open-file{background:#2980b9;color:white}
         .btn-open-explorer{background:#17a2b8;color:white}
         .btn-open-folder{background:#6f42c1;color:white}
@@ -866,6 +1034,7 @@ async function saveConfig(){const dirs=Array.from(selectedPaths),mr=document.get
 async function loadDriveTree(){const c=document.getElementById('treeContainer');c.innerHTML='';const r=await fetch('/api/drives'),drives=await r.json();for(const d of drives)c.appendChild(buildItem(d,'\\uD83D\\uDCBB '+d,true))}
 function buildItem(path,label,bold=false){const item=document.createElement('div');item.className='tree-item';const tg=document.createElement('span');tg.className='tree-toggle';tg.innerText='\\u25B6';tg.setAttribute('data-path',path);tg.onclick=function(){toggleF(this)};const cb=document.createElement('input');cb.type='checkbox';cb.value=path;cb.checked=selectedPaths.has(path);cb.onchange=function(){this.checked?selectedPaths.add(this.value):selectedPaths.delete(this.value)};const lb=document.createElement(bold?'strong':'span');lb.innerHTML=' '+label;const ch=document.createElement('div');ch.className='tree-children';item.appendChild(tg);item.appendChild(cb);item.appendChild(lb);item.appendChild(ch);return item}
 async function toggleF(el){const path=el.getAttribute('data-path'),ch=el.parentElement.querySelector('.tree-children');if(el.innerText==='\\u25B6'){el.innerText='\\u25BC';ch.classList.add('open');if(!ch.children.length){const r=await fetch('/api/ls?path='+encodeURIComponent(path)),subs=await r.json();if(!subs.length)ch.innerHTML='<div style="margin-left:20px;color:#555;font-style:italic">(no subfolders)</div>';else for(const s of subs)ch.appendChild(buildItem(s.path,'\\uD83D\\uDCC1 '+s.name))}}else{el.innerText='\\u25B6';ch.classList.remove('open')}}
+async function copyPath(p){try{await navigator.clipboard.writeText(p);showToast('📋 Path copied to clipboard!')}catch(e){const ta=document.createElement('textarea');ta.value=p;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('📋 Path copied to clipboard!')}}
 async function handleOpenFile(p){try{const r=await fetch('/api/open_file?path='+encodeURIComponent(p)),d=await r.json();showToast(d.status==='ok'?'Opening file...':d.message,d.status==='error')}catch(e){}}
 async function handleOpenExplorer(p){try{const r=await fetch('/api/open_folder?explorer=1&path='+encodeURIComponent(p)),d=await r.json();showToast(d.status==='ok'?'Opening folder...':d.message,d.status==='error')}catch(e){}}
 async function handleOpenFolder(p){try{const r=await fetch('/api/open_folder?path='+encodeURIComponent(p)),d=await r.json();showToast(d.status==='ok'?'Opening folder...':d.message,d.status==='error')}catch(e){}}
@@ -930,23 +1099,20 @@ class PhiHandler(SimpleHTTPRequestHandler):
 
         if parsed.path == "/api/phi_thumbnail":
             file_path = params.get("path", [""])[0]
-            # Proxy to search_app (port 8080) — identical thumbnails, no code duplication
-            try:
-                import urllib.request as _ur
-                encoded = urllib.parse.quote(file_path, safe="")
-                proxy_url = f"http://localhost:8080/api/thumbnail?path={encoded}"
-                with _ur.urlopen(proxy_url, timeout=5) as resp:
-                    img_data = resp.read()
-                    ctype = resp.headers.get("Content-Type", "image/jpeg")
+            risk = params.get("risk", [""])[0]
+            findings = params.get("findings", [""])[0]
+            img_data, ctype = get_phi_thumbnail_bytes(file_path, risk=risk, findings_str=findings)
+
+            if img_data:
                 try:
                     self.send_response(200)
-                    self.send_header("Content-Type", ctype)
-                    self.send_header("Cache-Control", "max-age=3600")
+                    self.send_header("Content-Type", ctype or "image/jpeg")
+                    self.send_header("Cache-Control", "no-cache, must-revalidate")
                     self.end_headers()
                     self.wfile.write(img_data)
                 except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
                     pass
-            except Exception:
+            else:
                 self.send_response(404)
                 self.end_headers()
             return
@@ -1073,7 +1239,7 @@ class PhiHandler(SimpleHTTPRequestHandler):
                     jp  = html.escape(fpath.replace("\\", "\\\\").replace("'", "\\'"))
                     ep  = urllib.parse.quote(fpath)
                     ef  = urllib.parse.quote(findings[:500])
-                    tu  = f"/api/phi_thumbnail?path={ep}&risk={risk}&findings={ef}"
+                    tu  = f"/api/phi_thumbnail?path={ep}&risk={risk}&findings={ef}&v=excel3"
 
                     cats = [re.sub(r"\s*\(\d+\)\s*$", "", c.strip()) for c in findings.split(";") if c.strip()]
                     tags = " ".join(f'<span class="finding-tag">{html.escape(c)}</span>' for c in cats[:12])
@@ -1089,6 +1255,7 @@ class PhiHandler(SimpleHTTPRequestHandler):
                             <div class="result-header">
                                 <span class="file-title">{fname}</span>
                                 <div class="card-actions">
+                                    <button type="button" class="btn-action btn-copy-path"     onclick="copyPath('{jp}')">📋 Copy Path</button>
                                     <button type="button" class="btn-action btn-open-file"     onclick="handleOpenFile('{jp}')">&#8599; Open</button>
                                     <button type="button" class="btn-action btn-open-explorer" onclick="handleOpenExplorer('{jp}')">&#128193; Explorer</button>
                                     <button type="button" class="btn-action btn-open-folder"   onclick="handleOpenFolder('{jp}')">&#128193; Opus</button>

@@ -20,6 +20,7 @@ if hasattr(sys.stderr, 'reconfigure'):
         sys.stderr.reconfigure(encoding='utf-8')
     except Exception:
         pass
+import csv
 import json
 import time
 import hashlib
@@ -41,6 +42,7 @@ try:
     fitz.TOOLS.mupdf_display_errors(False)
 except Exception:
     pass
+FITZ_LOCK = threading.Lock()
 
 try:
     import mammoth
@@ -96,10 +98,11 @@ SKIP_EXTENSIONS = {
     '.ini', '.log', '.tsv', '.pb', '.pak'
 }
 
-# Primary Human Document & Presentation Extensions ONLY (PDF, Word, Excel, PPT, Text, Markdown, RTF)
+# Primary Human Document & Presentation Extensions (PDF, Word, Excel, PPT, Text, Markdown, RTF, CSV)
 STRICT_DOCUMENT_EXTENSIONS = {
     '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt',
-    '.txt', '.md', '.markdown', '.rtf', '.odt', '.ods', '.odp', '.epub'
+    '.txt', '.md', '.markdown', '.rtf', '.odt', '.ods', '.odp', '.epub',
+    '.csv'
 }
 
 THUMB_CACHE_DIR = os.path.join(os.path.dirname(__file__), ".cache_thumbnails")
@@ -480,6 +483,129 @@ def generate_fast_xlsx_cover(file_path, cache_path):
     img.save(cache_path, 'JPEG', quality=90)
 
 
+def generate_fast_csv_cover(file_path, cache_path):
+    """
+    Renders CSV files as a clean Excel-style grid preview card,
+    parsing up to the first 2,000 characters into structured tabular rows.
+    """
+    file_name = os.path.basename(file_path)
+    img = Image.new('RGB', (600, 720), color='#ffffff')
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font_regular = ImageFont.truetype("arial.ttf", 12)
+        font_bold = ImageFont.truetype("arialbd.ttf", 12)
+        font_header = ImageFont.truetype("arialbd.ttf", 13)
+    except Exception:
+        font_regular = font_bold = font_header = ImageFont.load_default()
+
+    # 1. Outer Border & Excel Green Ribbon
+    draw.rectangle([0, 0, 599, 719], outline='#217346', width=2)
+    draw.rectangle([0, 0, 600, 30], fill='#217346')
+    draw.text((15, 7), f"CSV (Excel View)  |  {file_name[:40]}", fill='#ffffff', font=font_header)
+
+    # 2. Formula Bar
+    draw.rectangle([0, 30, 600, 54], fill='#f3f3f3', outline='#d0d0d0')
+    draw.text((12, 35), "fx", fill='#666666', font=font_bold)
+    draw.rectangle([40, 33, 590, 51], fill='#ffffff', outline='#d0d0d0')
+
+    # Read up to 2000 characters and parse via csv.reader
+    rows_data = []
+    try:
+        raw_text = ""
+        for enc in ('utf-8', 'utf-8-sig', 'cp1252', 'latin-1'):
+            try:
+                with open(file_path, 'r', encoding=enc, errors='strict') as f:
+                    raw_text = f.read(2000)
+                break
+            except UnicodeDecodeError:
+                continue
+            except Exception:
+                b = safe_read_bytes(file_path) if 'safe_read_bytes' in globals() else None
+                if b:
+                    try:
+                        raw_text = b[:8000].decode(enc, errors='strict')[:2000]
+                        break
+                    except Exception:
+                        pass
+                break
+        if not raw_text:
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    raw_text = f.read(2000)
+            except Exception:
+                b = safe_read_bytes(file_path) if 'safe_read_bytes' in globals() else None
+                if b:
+                    raw_text = b[:8000].decode('utf-8', errors='ignore')[:2000]
+
+        if raw_text:
+            dialect = csv.excel
+            try:
+                sample_snippet = raw_text[:1024]
+                dialect = csv.Sniffer().sniff(sample_snippet)
+            except Exception:
+                pass
+            reader = csv.reader(io.StringIO(raw_text), dialect)
+            for row in reader:
+                if row:
+                    rows_data.append(row)
+                if len(rows_data) >= 26:
+                    break
+    except Exception:
+        pass
+
+    cols = ['A', 'B', 'C', 'D', 'E', 'F']
+    col_widths = []
+    for c_idx in range(6):
+        max_len = 10
+        for r in rows_data:
+            if c_idx < len(r) and r[c_idx]:
+                v_str = str(r[c_idx]).replace('\xa0', ' ').replace('\ufffd', '•').strip()
+                if len(v_str) > max_len:
+                    max_len = len(v_str)
+        col_widths.append(max(60, min(260, max_len * 7 + 16)))
+
+    # 3. Column Headers (A, B, C, D, E, F)
+    draw.rectangle([0, 54, 600, 76], fill='#e6e6e6', outline='#d0d0d0')
+    draw.text((10, 58), "#", fill='#555555', font=font_bold)
+
+    x = 40
+    for i, col in enumerate(cols):
+        w = col_widths[i]
+        draw.rectangle([x, 54, x + w, 76], fill='#e6e6e6', outline='#c0c0c0')
+        draw.text((x + (w // 2) - 5, 58), col, fill='#333333', font=font_bold)
+        x += w
+
+    # 4. Render Grid Rows
+    y = 76
+    row_h = 24
+    for row_idx in range(1, 26):
+        if y > 700:
+            break
+        draw.rectangle([0, y, 40, y + row_h], fill='#e6e6e6', outline='#c0c0c0')
+        draw.text((10, y + 4), str(row_idx), fill='#555555', font=font_regular)
+
+        row_vals = rows_data[row_idx - 1] if row_idx <= len(rows_data) else []
+
+        x = 40
+        for i in range(6):
+            w = col_widths[i]
+            val_str = ""
+            if i < len(row_vals) and row_vals[i] is not None:
+                val_str = str(row_vals[i]).replace('\xa0', ' ').replace('\ufffd', '•').strip()
+
+            is_header_row = (row_idx == 1)
+            fill_color = '#f8f9fa' if is_header_row else '#ffffff'
+            draw.rectangle([x, y, x + w, y + row_h], fill=fill_color, outline='#e0e0e0')
+            if val_str:
+                use_font = font_bold if is_header_row else font_regular
+                draw.text((x + 6, y + 4), val_str[:32], fill='#111111', font=use_font)
+            x += w
+        y += row_h
+
+    img.save(cache_path, 'JPEG', quality=95)
+
+
 def generate_fast_text_cover(file_path, cache_path, ftype):
     file_name = os.path.basename(file_path)
     snippet = ""
@@ -533,12 +659,13 @@ def generate_thumbnail_if_missing(file_path: str, ext: str, force: bool = False)
                 pass
 
         if ext_clean == 'pdf':
-            doc = fitz.open(file_path)
-            if len(doc) > 0:
-                page = doc[0]
-                pix = page.get_pixmap(dpi=200)
-                pix.save(cache_path)
-                doc.close()
+            with FITZ_LOCK:
+                doc = fitz.open(file_path)
+                if len(doc) > 0:
+                    page = doc[0]
+                    pix = page.get_pixmap(dpi=200)
+                    pix.save(cache_path)
+                    doc.close()
 
         elif ext_clean in ('docx', 'doc'):
             generate_fast_docx_cover(file_path, cache_path)
@@ -549,7 +676,10 @@ def generate_thumbnail_if_missing(file_path: str, ext: str, force: bool = False)
         elif ext_clean in ('xlsx', 'xls'):
             generate_fast_xlsx_cover(file_path, cache_path)
 
-        elif ext_clean in ('txt', 'md', 'csv', 'rtf'):
+        elif ext_clean in ('csv', 'tsv'):
+            generate_fast_csv_cover(file_path, cache_path)
+
+        elif ext_clean in ('txt', 'md', 'rtf'):
             generate_fast_text_cover(file_path, cache_path, ext_clean)
     except Exception:
         pass
@@ -608,23 +738,27 @@ def extract_file_content(file_path: str, max_bytes: int = 1_000_000) -> str:
     if not data:
         return ""
 
-    if ext in ['.txt', '.md', '.rtf']:
+    if ext in ['.txt', '.md', '.rtf', '.csv']:
         try:
             return data[:max_bytes].decode('utf-8', errors='ignore')
         except Exception:
-            return ""
+            try:
+                return data[:max_bytes].decode('latin-1', errors='ignore')
+            except Exception:
+                return ""
 
     elif ext == '.pdf':
         try:
-            doc = fitz.open(stream=data, filetype="pdf")
-            text_parts = []
-            for i, page in enumerate(doc):
-                if i >= 50:
-                    break
-                text = page.get_text()
-                if text:
-                    text_parts.append(text)
-            doc.close()
+            with FITZ_LOCK:
+                doc = fitz.open(stream=data, filetype="pdf")
+                text_parts = []
+                for i, page in enumerate(doc):
+                    if i >= 50:
+                        break
+                    text = page.get_text()
+                    if text:
+                        text_parts.append(text)
+                doc.close()
             return "\n".join(text_parts)[:max_bytes]
         except Exception:
             return ""
@@ -692,7 +826,11 @@ def fetch_existing_metadata(client, index_name="documents"):
                 norm = os.path.normpath(os.path.abspath(fp)).lower()
                 # Store actual _id from index so cleanup can delete by the real ID,
                 # not a recomputed hash that may differ if the hashing scheme changed.
-                existing_map[norm] = (src.get('modified_date'), src.get('file_size'), doc.get('_id'))
+                # Also preserve the raw original path (element [3]) so the ghost cleanup
+                # pass can call os.path.exists() on the real casing rather than the
+                # lowercased key — a Windows case-insensitive filesystem can still
+                # return False for lowercased long-path or UNC variants.
+                existing_map[norm] = (src.get('modified_date'), src.get('file_size'), doc.get('_id'), fp)
             if count % 2000 == 0 or count == total_docs:
                 pct_str = f" ({int(count / total_docs * 100)}%)" if total_docs > 0 else ""
                 write_progress(True, 0, 0, 0, f"⚡ Pre-fetching database metadata: {count:,} / {total_str} loaded{pct_str}... (takes ~15-30s)")
@@ -733,6 +871,32 @@ def record_sync_event(action_label: str, src_path: str, dest_path: str, reason: 
                 f.write(entry)
     except Exception:
         pass
+
+
+# Windows file attribute flags for OneDrive Files On-Demand cloud-only placeholders.
+# FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS: file is not locally cached (cloud-only stub).
+# FILE_ATTRIBUTE_OFFLINE: file data is not immediately available (archived/offline).
+_FA_RECALL_ON_DATA_ACCESS = 0x400000
+_FA_OFFLINE = 0x1000
+
+
+def is_cloud_only_placeholder(file_path: str) -> bool:
+    """Return True if file_path is a OneDrive Files On-Demand placeholder that is NOT
+    stored locally.  Reading such files while OneDrive is paused raises WinError 404
+    ('The cloud file provider exited unexpectedly'), produces empty indexed content,
+    and fails thumbnail generation.  Detecting them upfront lets us index metadata
+    only and skip the read — avoiding log noise and silent empty-content documents."""
+    try:
+        attrs = ctypes.windll.kernel32.GetFileAttributesW(file_path)
+        if attrs == 0xFFFFFFFF:  # INVALID_FILE_ATTRIBUTES
+            return False
+        return bool(attrs & _FA_RECALL_ON_DATA_ACCESS) or bool(attrs & _FA_OFFLINE)
+    except Exception:
+        return False
+
+
+BACKUP_FAILURES = []
+BACKUP_FAILURES_LOCK = threading.Lock()
 
 
 def copy_file_to_backup(file_path: str, backup_dir: str) -> str:
@@ -795,6 +959,8 @@ def copy_file_to_backup(file_path: str, backup_dir: str) -> str:
         return dest_path
     except Exception as e:
         print(f"[-] Backup copy error for '{file_path}': {e}")
+        with BACKUP_FAILURES_LOCK:
+            BACKUP_FAILURES.append(f"{file_path}: {e}")
         return None
 
 
@@ -812,14 +978,22 @@ def process_single_file(file_path: str, index_name: str, existing_map: dict = No
         mtime_iso = datetime.fromtimestamp(stat.st_mtime).isoformat()
         file_size = stat.st_size
 
-        # Handle Document Backup (Skipping excluded extensions like .csv)
+        # Handle Document Backup
         backup_dest = None
         is_backed_up = False
+        is_cloud_only = False
         if exclude_backup_exts is None:
-            exclude_backup_exts = {'.csv'}
+            exclude_backup_exts = set()
+
+        # Detect OneDrive Files On-Demand cloud-only placeholders before any read attempt.
+        # These files have correct metadata (stat works fine) but their content is not
+        # stored locally.  Attempting to read them while OneDrive is paused raises
+        # WinError 404.  We index their metadata only and skip backup/content/thumbnail.
+        if is_cloud_only_placeholder(file_path):
+            is_cloud_only = True
 
         # Bypass local D:\Backups\Documents for D:\Active research (it syncs directly to NAS in Phase 3)
-        if backup_dir and ext not in exclude_backup_exts and not norm_path.startswith(r"d:\active research"):
+        if not is_cloud_only and backup_dir and ext not in exclude_backup_exts and not norm_path.startswith(r"d:\active research"):
             backup_dest = copy_file_to_backup(file_path, backup_dir)
             is_backed_up = backup_dest is not None
 
@@ -838,14 +1012,19 @@ def process_single_file(file_path: str, index_name: str, existing_map: dict = No
                 except Exception:
                     pass
 
-        # Canonical path hash for consistent document ID across drive casing
         doc_id = hashlib.sha256(norm_path.encode('utf-8')).hexdigest()
         file_dir = os.path.dirname(file_path)
         file_type = ext.lstrip('.').lower()
-        content = extract_file_content(file_path)
-        
-        # Trigger cover thumbnail generation if missing
-        generate_thumbnail_if_missing(file_path, file_type)
+
+        if is_cloud_only:
+            # Index metadata only — do not attempt to read content or generate thumbnail.
+            # The file will be findable by name/path/date but not by full-text content
+            # until it is downloaded locally and re-indexed on the next run.
+            content = ''
+        else:
+            content = extract_file_content(file_path)
+            # Trigger cover thumbnail generation if missing
+            generate_thumbnail_if_missing(file_path, file_type)
 
         doc = {
             "_op_type": "index",
@@ -861,6 +1040,7 @@ def process_single_file(file_path: str, index_name: str, existing_map: dict = No
             "modified_date": mtime_iso,
             "is_backed_up": is_backed_up,
             "backup_path": backup_dest,
+            "is_cloud_only": is_cloud_only,
             "content": content
         }
         return doc, 'indexed'
@@ -935,7 +1115,7 @@ def get_latest_file_info(source_dir: str):
 
 PROGRESS_FILE = os.path.join(os.path.dirname(__file__), "indexer_progress.json")
 
-def write_progress(is_running: bool, scanned: int, indexed: int, skipped: int, status_msg: str, san_summary: dict = None):
+def write_progress(is_running: bool, scanned: int, indexed: int, skipped: int, status_msg: str, san_summary: dict = None, status: str = None, error_details: str = None):
     try:
         data = {
             "is_running": is_running,
@@ -943,8 +1123,11 @@ def write_progress(is_running: bool, scanned: int, indexed: int, skipped: int, s
             "indexed": indexed,
             "skipped": skipped,
             "status_message": status_msg,
+            "status": status or ("running" if is_running else "completed"),
             "timestamp": time.time()
         }
+        if error_details:
+            data["error_details"] = error_details
         if san_summary is not None:
             data["san_summary"] = san_summary
         elif os.path.exists(PROGRESS_FILE):
@@ -1044,7 +1227,7 @@ def build_san_summary_dict(network_target: str = r"\\Synology_NAS\Videos and pic
     return san_summary
 
 
-def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copied: int = 0, base_skipped: int = 0, san_summary: dict = None, phase_prefix: str = "⚡ Phase 3/3"):
+def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copied: int = 0, base_skipped: int = 0, san_summary: dict = None, phase_prefix: str = "⚡ Phase 3/3", _permission_retried: bool = False):
     """
     Runs Robocopy with /V /NP /NJH and parses live stdout streaming for dynamic progress updates.
     Includes an active heartbeat status while Robocopy builds and compares remote directory trees over SMB.
@@ -1055,12 +1238,18 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
     # Remove flags that suppress stdout file output or summary
     cmd_filtered = [arg for arg in cmd if arg not in ["/NFL", "/NDL", "/NJH", "/NJS", "/NC", "/NS", "/NP", "/V"]]
     cmd_filtered.extend(["/V", "/NP", "/NJH"])
+    # Keep diagnostics outside the source tree so the log cannot copy itself.
+    log_dir = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "OpenSearch" / "backup_logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / f"{datetime.now():%Y%m%d_%H%M%S_%f}.log"
+    cmd_filtered.append(f"/UNILOG:{log_path}")
+    cmd_filtered.append("/TEE")
+    print(f"[*] Robocopy log: {log_path}")
     
     copied_count = 0
     skipped_count = 0
     
     last_update_t = 0.0
-    stdout_lines = []
     start_time = time.time()
     first_line_received = threading.Event()
     stop_heartbeat = threading.Event()
@@ -1071,8 +1260,7 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
 
     def _heartbeat():
         while not stop_heartbeat.is_set():
-            time.sleep(1.0)
-            if stop_heartbeat.is_set():
+            if stop_heartbeat.wait(1.0):
                 break
             if not first_line_received.is_set():
                 elapsed = int(time.time() - start_time)
@@ -1089,7 +1277,6 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
         for line in iter(proc.stdout.readline, ''):
             if not first_line_received.is_set():
                 first_line_received.set()
-            stdout_lines.append(line)
             l = line.strip()
             if not l:
                 continue
@@ -1112,27 +1299,60 @@ def run_robocopy_with_live_progress(cmd: list, label: str = "Syncing", base_copi
                 last_update_t = now
                 
         proc.wait()
+        proc.stdout.close()
         returncode = proc.returncode
-        stdout_data = "".join(stdout_lines)
     except Exception as e:
         print(f"[-] Failed to launch Robocopy: {e}")
         returncode = 16
     finally:
         first_line_received.set()
         stop_heartbeat.set()
+        heartbeat_thread.join()
+
+    # Repair only access-denied errors from the Active research source. Network,
+    # disk, and other errors remain failures. A read-only verification never repairs.
+    if (not 0 <= returncode <= 7 and not _permission_retried
+            and len(cmd) > 2 and os.path.normcase(os.path.abspath(cmd[1])) == os.path.normcase(r"D:\Active research")
+            and "/L" not in [argument.upper() for argument in cmd]):
+        try:
+            from backup_permission_helper import repair_denied_paths
+            if repair_denied_paths(log_path):
+                print("[*] Read permissions repaired; retrying backup automatically.")
+                retry_code, retry_copied, retry_skipped = run_robocopy_with_live_progress(
+                    cmd, label=label, base_copied=base_copied + copied_count,
+                    base_skipped=base_skipped, san_summary=san_summary,
+                    phase_prefix=phase_prefix, _permission_retried=True,
+                )
+                return retry_code, copied_count + retry_copied, retry_skipped
+        except Exception as repair_error:
+            print(f"[-] Automatic permission repair failed: {repair_error}")
 
     total_c = base_copied + copied_count
     total_s = base_skipped + skipped_count
     total_chk = total_c + total_s
-    final_msg = f"{phase_prefix} ({total_c:,} synced, {total_s:,} skipped / {total_chk:,} checked): {label} complete"
+    outcome = "complete" if 0 <= returncode <= 7 else f"FAILED (code {returncode}; log: {log_path})"
+    final_msg = f"{phase_prefix} ({total_c:,} synced, {total_s:,} skipped / {total_chk:,} checked): {label} {outcome}"
     write_progress(True, total_chk, total_c, total_s, final_msg, san_summary=san_summary)
+    if not 0 <= returncode <= 7:
+        print(f"[-] {label}: {outcome}")
     return returncode, copied_count, skipped_count
+
+
+def active_research_backup_command(network_target: str) -> list:
+    """The same mirror and exclusions for scheduled backups and manual retries."""
+    return [
+        "robocopy", r"D:\Active research", os.path.join(network_target, "Active research"),
+        "/MIR", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32",
+        "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache",
+        ".cache_thumbnails", "appdata", "identified", "scratch", "temp",
+        "/XF", "indexer_config.json", "indexer_progress.json", "sync_progress.json",
+        "robocopy_monitor.log", "sync_audit_report.txt",
+    ]
 
 
 def sync_to_network_target(backup_dir: str, network_target: str, net_user: str = None, net_pass: str = None, alert_email: str = ALERT_EMAIL_RECIPIENT, smtp_server: str = "mail-relay.iu.edu"):
     if not backup_dir or not os.path.exists(backup_dir):
-        print(f"[-] Backup directory '{backup_dir}' does not exist. Skipping network copy.")
-        return
+        raise RuntimeError(f"Backup directory '{backup_dir}' does not exist; network backup cannot run")
     if not network_target:
         return
 
@@ -1152,8 +1372,17 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
     san_summary = build_san_summary_dict(network_target)
     cum_copied = 0
     cum_skipped = 0
+    failures = []
+
+    def run_checked(cmd, **kwargs):
+        result = run_robocopy_with_live_progress(cmd, **kwargs)
+        if not 0 <= result[0] <= 7:
+            failures.append(f"{kwargs.get('label', 'Backup')}: Robocopy code {result[0]}")
+        return result
 
     try:
+        if sys.platform != 'win32':
+            raise RuntimeError("NAS backup requires Windows Robocopy")
         os.makedirs(network_target, exist_ok=True)
 
         # Launch Audit report scanner asynchronously in background thread so Robocopy starts immediately
@@ -1174,7 +1403,7 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         local_backups_root = os.path.dirname(backup_dir) if backup_dir.lower().endswith(r"\documents") else backup_dir
         if sys.platform == 'win32':
             cmd = ["robocopy", local_backups_root, network_target, "/MIR", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", "scratch", "temp", "Active research", "EndNote", "Quicken", "/XF", "indexer_config.json", "indexer_progress.json", "sync_progress.json", "robocopy_monitor.log", "sync_audit_report.txt"]
-            code, c1, s1 = run_robocopy_with_live_progress(cmd, label=f"Syncing backups to '{network_target}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
+            code, c1, s1 = run_checked(cmd, label=f"Syncing backups to '{network_target}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c1
             cum_skipped += s1
             if code <= 7:
@@ -1196,14 +1425,16 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
             print(f"[*] Syncing ALL file types from '{active_res_src}' directly to NAS target...")
             os.makedirs(active_res_nas, exist_ok=True)
             if sys.platform == 'win32':
-                cmd_ar = ["robocopy", active_res_src, active_res_nas, "/MIR", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/XD", "__pycache__", ".git", "node_modules", ".venv", "venv", ".cache", ".cache_thumbnails", "appdata", "identified", "scratch", "temp", "/XF", "indexer_config.json", "indexer_progress.json", "sync_progress.json", "robocopy_monitor.log", "sync_audit_report.txt"]
-                returncode_ar, c2, s2 = run_robocopy_with_live_progress(cmd_ar, label=f"Syncing Active research to '{active_res_nas}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
+                cmd_ar = active_research_backup_command(network_target)
+                returncode_ar, c2, s2 = run_checked(cmd_ar, label=f"Syncing Active research to '{active_res_nas}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
                 cum_copied += c2
                 cum_skipped += s2
                 if returncode_ar <= 7:
                     print(f"[✓] Direct Active research NAS sync complete to '{active_res_nas}'!")
                 else:
                     print(f"[-] Robocopy code {returncode_ar} during direct Active research NAS sync.")
+        else:
+            failures.append(f"Active research source is missing: {active_res_src}")
 
         ar_fname, ar_ftime, ar_fpath = get_latest_file_info(active_res_src)
         san_summary["Active Research"] = {
@@ -1224,17 +1455,19 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
             print(f"[*] Syncing EndNote from '{src_e}' to SAN target '{endnote_nas_dst}'...")
             if os.path.normpath(src_e) != os.path.normpath(endnote_local_dst):
                 cmd_e1 = ["robocopy", src_e, endnote_local_dst, "/E", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/NFL", "/NDL"]
-                code_e1, c_e1, s_e1 = run_robocopy_with_live_progress(cmd_e1, label=f"Local EndNote sync to '{endnote_local_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
+                code_e1, c_e1, s_e1 = run_checked(cmd_e1, label=f"Local EndNote sync to '{endnote_local_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
                 cum_copied += c_e1
                 cum_skipped += s_e1
             cmd_e2 = ["robocopy", endnote_local_dst, endnote_nas_dst, "/E", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/NFL", "/NDL"]
-            returncode_e, c_e2, s_e2 = run_robocopy_with_live_progress(cmd_e2, label=f"Syncing EndNote to '{endnote_nas_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
+            returncode_e, c_e2, s_e2 = run_checked(cmd_e2, label=f"Syncing EndNote to '{endnote_nas_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c_e2
             cum_skipped += s_e2
             if returncode_e <= 7:
                 print(f"[✓] EndNote SAN sync complete to '{endnote_nas_dst}'!")
             else:
                 print(f"[-] Robocopy code {returncode_e} during EndNote SAN sync.")
+        else:
+            failures.append(f"EndNote source is missing: {src_e}")
 
         e_fname, e_ftime, e_fpath = get_latest_file_info(src_e)
         san_summary["EndNote"] = {
@@ -1252,17 +1485,19 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         if os.path.exists(quicken_src) and sys.platform == 'win32':
             print(f"[*] Syncing Quicken from '{quicken_src}' to SAN target '{quicken_nas_dst}'...")
             cmd_q1 = ["robocopy", quicken_src, quicken_local_dst, "/E", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/NFL", "/NDL"]
-            code_q1, c_q1, s_q1 = run_robocopy_with_live_progress(cmd_q1, label=f"Local Quicken sync to '{quicken_local_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
+            code_q1, c_q1, s_q1 = run_checked(cmd_q1, label=f"Local Quicken sync to '{quicken_local_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c_q1
             cum_skipped += s_q1
             cmd_q2 = ["robocopy", quicken_local_dst, quicken_nas_dst, "/E", "/FFT", "/DCOPY:DA", "/R:1", "/W:2", "/MT:32", "/NFL", "/NDL"]
-            returncode_q, c_q2, s_q2 = run_robocopy_with_live_progress(cmd_q2, label=f"Syncing Quicken to '{quicken_nas_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
+            returncode_q, c_q2, s_q2 = run_checked(cmd_q2, label=f"Syncing Quicken to '{quicken_nas_dst}'", base_copied=cum_copied, base_skipped=cum_skipped, san_summary=san_summary)
             cum_copied += c_q2
             cum_skipped += s_q2
             if returncode_q <= 7:
                 print(f"[✓] Quicken SAN sync complete to '{quicken_nas_dst}'!")
             else:
                 print(f"[-] Robocopy code {returncode_q} during Quicken SAN sync.")
+        else:
+            failures.append(f"Quicken source is missing: {quicken_src}")
 
         q_fname, q_ftime, q_fpath = get_latest_file_info(quicken_src)
         san_summary["Quicken"] = {
@@ -1287,7 +1522,9 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         print("==========================================================================================\n")
 
         # Save summary to progress JSON for UI consumption
-        write_progress(False, 0, 0, 0, "✅ SAN Backup Complete!", san_summary=san_summary)
+        if failures:
+            raise RuntimeError("; ".join(failures))
+        write_progress(True, 0, 0, 0, "SAN backup jobs succeeded; finalizing...", san_summary=san_summary)
 
     except Exception as e:
         sync_failed = True
@@ -1295,23 +1532,9 @@ def sync_to_network_target(backup_dir: str, network_target: str, net_user: str =
         print(f"[-] Network backup sync failed: {e}")
 
     if sync_failed:
-        recipient = alert_email or ALERT_EMAIL_RECIPIENT
-        subject = "⚠️ OpenSearch Backup Alert: SAN Target Sync Failed"
-        body = f"""OpenSearch Document Indexer Alert
-
-The automatic backup sync to your SAN network target could not be written.
-
-Network Target Path: {network_target}
-Local Backup Path: {backup_dir}
-Timestamp: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-Max Retries Attempted: 1
-
-Failure Details:
-{failure_reason}
-
-Note: Your local OpenSearch database index and primary local backups (on {backup_dir}) remain 100% safe and intact.
-"""
-        send_email_alert(subject, body, recipient=recipient, smtp_server=smtp_server)
+        write_progress(False, 0, 0, 0, "❌ NAS backup failed", san_summary=san_summary,
+                       status="failed", error_details=failure_reason)
+        raise RuntimeError(f"NAS backup failed: {failure_reason}")
 
 
 def backup_full_directory(src_dir: str, backup_dir: str):
@@ -1330,7 +1553,7 @@ def backup_full_directory(src_dir: str, backup_dir: str):
             if res_code <= 7:
                 print(f"[✓] Full backup complete for '{src_dir}' -> '{dest_dir}'!")
             else:
-                print(f"[-] Robocopy backup code {res_code} for '{src_dir}'")
+                raise RuntimeError(f"Robocopy backup code {res_code} for '{src_dir}'")
         else:
             for root, dirs, files in os.walk(src_dir):
                 rel = os.path.relpath(root, src_dir)
@@ -1345,6 +1568,7 @@ def backup_full_directory(src_dir: str, backup_dir: str):
             print(f"[✓] Full backup complete for '{src_dir}' -> '{dest_dir}'!")
     except Exception as e:
         print(f"[-] Full backup error for '{src_dir}': {e}")
+        raise
 
 
 ONEDRIVE_EXE = r"C:\Program Files\Microsoft OneDrive\OneDrive.exe"
@@ -1352,19 +1576,28 @@ DROPBOX_EXE = r"C:\Program Files (x86)\Dropbox\Client\Dropbox.exe"
 
 
 def pause_cloud_sync():
-    """Stops OneDrive and Dropbox sync processes completely during indexing to prevent file locks."""
-    print("[*] Pausing OneDrive & Dropbox sync processes during indexing...")
+    r"""Pauses OneDrive sync during indexing to prevent file locks.
+
+    NOTE: Dropbox is intentionally NOT killed here.  Dropbox has no clean
+    pause/resume API — force-killing Dropbox.exe unmounts D:\Dropbox, which
+    causes the ghost cleanup pass to treat all ~8,500 Dropbox documents as
+    deleted and purge them from the index on every overnight run.  The
+    indexer already handles locked files via safe_read_locked_file(), so
+    Dropbox does not need to be stopped.
+    """
+    print("[*] Pausing OneDrive sync during indexing (Dropbox left running)...")
     import subprocess
-    # Shutdown OneDrive cleanly first
-    for odp in [r"C:\Program Files\Microsoft OneDrive\OneDrive.exe", os.path.expanduser(r"~\AppData\Local\Microsoft\OneDrive\OneDrive.exe")]:
+    # Shutdown OneDrive cleanly — it supports /shutdown and /background flags.
+    for odp in [r"C:\Program Files\Microsoft OneDrive\OneDrive.exe",
+                os.path.expanduser(r"~\AppData\Local\Microsoft\OneDrive\OneDrive.exe")]:
         if os.path.exists(odp):
             try:
                 subprocess.run([odp, "/shutdown"], capture_output=True, timeout=5)
             except Exception:
                 pass
 
-    # Force kill any remaining sync processes
-    for proc in ["OneDrive.exe", "OneDrive.Sync.Service.exe", "Dropbox.exe"]:
+    # Kill any remaining OneDrive helper processes — but NOT Dropbox.exe.
+    for proc in ["OneDrive.exe", "OneDrive.Sync.Service.exe"]:
         try:
             subprocess.run(["taskkill", "/F", "/T", "/IM", proc], capture_output=True, timeout=5)
         except Exception:
@@ -1391,7 +1624,26 @@ def resume_cloud_sync():
             pass
 
 
+def prevent_sleep():
+    if sys.platform == "win32":
+        try:
+            # ES_CONTINUOUS | ES_SYSTEM_REQUIRED (0x80000001)
+            ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001)
+        except Exception:
+            pass
+
+def allow_sleep():
+    if sys.platform == "win32":
+        try:
+            # ES_CONTINUOUS (0x80000000)
+            ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
+        except Exception:
+            pass
+
+
 def main():
+    BACKUP_FAILURES.clear()
+    prevent_sleep()
     parser = argparse.ArgumentParser(description="Ingest documents into OpenSearch with Hybrid Delta Indexing")
     parser.add_argument("--dir", nargs="+", help="Directories to scan and index")
     parser.add_argument("--index", default="documents", help="Target OpenSearch index name")
@@ -1405,9 +1657,13 @@ def main():
     if not args.no_pause_sync:
         pause_cloud_sync()
 
+    total_scanned = 0
+    total_indexed = 0
+    total_skipped = 0
+
     try:
         config_backup_dir = r"D:\Backups\Documents"
-        config_exclude_exts = [".csv"]
+        config_exclude_exts = []
         config_network_target = None
 
         config_path = os.path.join(os.path.dirname(__file__), "indexer_config.json")
@@ -1418,7 +1674,7 @@ def main():
                     if not args.dir:
                         args.dir = cfg.get("selected_directories", [r"D:\Active research"])
                     config_backup_dir = cfg.get("backup_directory", r"D:\Backups\Documents")
-                    config_exclude_exts = cfg.get("exclude_backup_extensions", [".csv"])
+                    config_exclude_exts = cfg.get("exclude_backup_extensions", [])
                     config_network_target = cfg.get("network_backup_target", None)
             except Exception:
                 pass
@@ -1510,25 +1766,75 @@ def main():
                     pass
 
         # Ghost / Dead File Cleanup Pass (Purges deleted files from OpenSearch index, thumbnail cache, and local backup)
+        #
+        # Existence check strategy:
+        #   existing_map keys are lowercased+normpathed strings (used as fast dict keys).
+        #   But os.path.exists() on a lowercased path can spuriously return False on Windows
+        #   when the stored path used a different casing, UNC prefix, or long-path (\\?\)
+        #   form.  We therefore check the ORIGINAL raw path (element [3] in the tuple,
+        #   added during metadata fetch) first, and only fall back to the lowercased key.
+        #   This prevents stale index entries from surviving reindex runs simply because
+        #   of path normalization mismatches.
         total_deleted = 0
         if existing_map:
-            dead_paths = [fp for fp in existing_map.keys() if not os.path.exists(fp)]
-            if dead_paths:
-                print(f"[*] Cleaning up {len(dead_paths):,} deleted or moved documents from index & backups...")
-                for fp in dead_paths:
+            # Build a reachability map for each scan root so we never purge an
+            # entire cloud-sync folder just because the mount is temporarily offline.
+            # If the root itself is unreachable, skip ALL files under it — they
+            # are not "deleted", merely inaccessible (e.g. Dropbox disconnected).
+            scan_roots = [os.path.normpath(os.path.abspath(d)).lower() for d in (args.dir or [])]
+
+            def root_is_reachable(path_lower):
+                """Return True if the scan root that contains path_lower is accessible."""
+                for root in scan_roots:
+                    if path_lower.startswith(root):
+                        return os.path.isdir(root)
+                # Path not under any known scan root — conservatively skip deletion.
+                return True
+
+            dead_norm_keys = []
+            skipped_offline = 0
+            for norm_key, entry in existing_map.items():
+                # entry = (modified_date, file_size, _id, original_raw_path)
+                # element [3] was added in fetch_existing_metadata; older in-memory maps
+                # (e.g. from --force=False fallback) may only have 3 elements — handle both.
+                raw_path = entry[3] if len(entry) > 3 and entry[3] else norm_key
+
+                # Guard: if the scan root for this file is itself offline/unmounted,
+                # do NOT mark the file as dead — the sync service may simply be
+                # temporarily disconnected (e.g. Dropbox restarting).
+                if not root_is_reachable(norm_key):
+                    skipped_offline += 1
+                    continue
+
+                # A file is dead only if NEITHER the raw original path NOR the lowercased
+                # key resolves to an existing file on disk.
+                if not os.path.exists(raw_path) and not os.path.exists(norm_key):
+                    dead_norm_keys.append(norm_key)
+
+            if skipped_offline:
+                print(f"[!] Skipped ghost-cleanup for {skipped_offline:,} files whose scan root is currently offline (cloud sync disconnected).")
+
+            if dead_norm_keys:
+                print(f"[*] Cleaning up {len(dead_norm_keys):,} deleted or moved documents from index & backups...")
+                for norm_key in dead_norm_keys:
                     try:
+                        stored_entry = existing_map.get(norm_key, (None, None, None))
+                        raw_path = stored_entry[3] if len(stored_entry) > 3 and stored_entry[3] else norm_key
+
                         # 1. Remove from OpenSearch Index
                         # Use the actual _id stored during metadata fetch — do NOT recompute
                         # the hash, as older docs may have been indexed with a different
                         # casing scheme (mixed-case path vs. lowercased), producing a
                         # different SHA-256 and a silent 404 on delete.
-                        stored_entry = existing_map.get(fp, (None, None, None))
-                        doc_id = stored_entry[2] if len(stored_entry) > 2 and stored_entry[2] else hashlib.sha256(fp.encode('utf-8')).hexdigest()
+                        doc_id = stored_entry[2] if len(stored_entry) > 2 and stored_entry[2] else hashlib.sha256(raw_path.encode('utf-8')).hexdigest()
                         client.delete(index=args.index, id=doc_id, ignore=[404])
                         total_deleted += 1
+                        print(f"[✓] Purged from index: {raw_path}")
 
                         # 2. Remove cached thumbnail
-                        file_hash = get_thumbnail_hash(fp)
+                        # get_thumbnail_hash() internally lowercases+normpath, so passing
+                        # either raw_path or norm_key produces the same hash.
+                        file_hash = get_thumbnail_hash(raw_path)
                         cache_path = os.path.join(THUMB_CACHE_DIR, f"{file_hash}.jpg")
                         if os.path.exists(cache_path):
                             try:
@@ -1537,9 +1843,12 @@ def main():
                                 pass
 
                         # 3. Remove local backup copy so robocopy /MIR syncs deletion to NAS
+                        # Use the original-cased raw_path for drive/path splitting so that
+                        # the reconstructed backup path matches what was actually backed up
+                        # (backups preserve original casing).
                         if backup_dir:
-                            norm_p = os.path.normpath(os.path.abspath(fp))
-                            drive, rest = os.path.splitdrive(norm_p)
+                            real_p = os.path.normpath(os.path.abspath(raw_path))
+                            drive, rest = os.path.splitdrive(real_p)
                             rel_path = rest.lstrip('\\').lstrip('/')
                             local_b_path = os.path.join(backup_dir, rel_path)
                             if os.path.exists(local_b_path):
@@ -1548,6 +1857,16 @@ def main():
                                     print(f"[✓] Purged deleted file from local backup: {local_b_path}")
                                 except Exception:
                                     pass
+                            else:
+                                # Also try with lowercased rel_path in case backup was written
+                                # under lowercased subpath (shouldn't happen, but defensive).
+                                lower_b_path = os.path.join(backup_dir, rel_path.lower())
+                                if lower_b_path != local_b_path and os.path.exists(lower_b_path):
+                                    try:
+                                        os.remove(lower_b_path)
+                                        print(f"[✓] Purged deleted file from local backup (lc): {lower_b_path}")
+                                    except Exception:
+                                        pass
                     except Exception:
                         pass
                 client.indices.refresh(index=args.index)
@@ -1567,8 +1886,10 @@ def main():
                 backup_full_directory(src, backup_dir)
 
         # Phase 3: Optional Network Backup Sync Phase
+        net_target = args.network_target or config_network_target
+        if net_target and (not backup_dir or not os.path.exists(backup_dir)):
+            raise RuntimeError("Configured NAS backup cannot run: local backup directory is missing")
         if backup_dir and os.path.exists(backup_dir):
-            net_target = args.network_target or config_network_target
             if not net_target and sys.stdin.isatty():
                 try:
                     ans = input("\n[?] Ingestion and local backup complete. Would you like to save/sync backups to a network target? (y/N): ").strip().lower()
@@ -1581,10 +1902,22 @@ def main():
                 san_sum = build_san_summary_dict(net_target)
                 write_progress(True, total_scanned, total_indexed, total_skipped, f"⚡ Phase 3/3 Audit: Initializing NAS sync scan to '{net_target}'...", san_summary=san_sum)
                 sync_to_network_target(backup_dir, net_target)
+
+        if BACKUP_FAILURES:
+            raise RuntimeError(f"{len(BACKUP_FAILURES)} local file backup(s) failed: " + "; ".join(BACKUP_FAILURES[:5]))
         
-        final_msg = f"✅ All Phases Complete ({total_scanned:,} docs checked, backups synced)!"
-        write_progress(False, total_scanned, total_indexed, total_skipped, final_msg)
+        backup_message = "local and NAS backups succeeded" if net_target else ("local backups succeeded; NAS backup not requested" if backup_dir else "backups disabled")
+        final_msg = f"✅ All Phases Complete ({total_scanned:,} docs checked; {backup_message})!"
+        write_progress(False, total_scanned, total_indexed, total_skipped, final_msg, status="completed")
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[-] Fatal error during indexing: {e}\n{tb}", file=sys.stderr)
+        err_msg = f"❌ Indexing/Backup Failed: {str(e)[:80]}"
+        write_progress(False, total_scanned, total_indexed, total_skipped, err_msg, status="failed", error_details=tb)
+        raise
     finally:
+        allow_sleep()
         if not args.no_pause_sync:
             resume_cloud_sync()
 

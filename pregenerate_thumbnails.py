@@ -12,6 +12,7 @@ import hashlib
 import zipfile
 import tempfile
 import ctypes
+import csv
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from opensearchpy import OpenSearch
@@ -23,6 +24,7 @@ try:
 except Exception:
     pass
 import threading
+FITZ_LOCK = threading.Lock()
 
 try:
     import mammoth
@@ -178,6 +180,124 @@ img {{ max-width: 100%; height: auto; display: block; margin: 12px 0; border-rad
         draw.text((50, 165), "(Word Document Preview)", fill='#6c757d')
 
     img.save(cache_path, 'JPEG', quality=90)
+
+
+def generate_fast_csv_cover(file_path, cache_path):
+    """
+    Renders CSV files as a clean Excel-style grid preview card,
+    parsing up to the first 2,000 characters into structured tabular rows.
+    """
+    file_name = os.path.basename(file_path)
+    img = Image.new('RGB', (600, 720), color='#ffffff')
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font_regular = ImageFont.truetype("arial.ttf", 12)
+        font_bold = ImageFont.truetype("arialbd.ttf", 12)
+        font_header = ImageFont.truetype("arialbd.ttf", 13)
+    except Exception:
+        font_regular = font_bold = font_header = ImageFont.load_default()
+
+    draw.rectangle([0, 0, 599, 719], outline='#217346', width=2)
+    draw.rectangle([0, 0, 600, 30], fill='#217346')
+    draw.text((15, 7), f"CSV (Excel View)  |  {file_name[:40]}", fill='#ffffff', font=font_header)
+
+    draw.rectangle([0, 30, 600, 54], fill='#f3f3f3', outline='#d0d0d0')
+    draw.text((12, 35), "fx", fill='#666666', font=font_bold)
+    draw.rectangle([40, 33, 590, 51], fill='#ffffff', outline='#d0d0d0')
+
+    rows_data = []
+    try:
+        raw_text = ""
+        for enc in ('utf-8', 'utf-8-sig', 'cp1252', 'latin-1'):
+            try:
+                with open(file_path, 'r', encoding=enc, errors='strict') as f:
+                    raw_text = f.read(2000)
+                break
+            except UnicodeDecodeError:
+                continue
+            except Exception:
+                b = safe_read_bytes(file_path) if 'safe_read_bytes' in globals() else None
+                if b:
+                    try:
+                        raw_text = b[:8000].decode(enc, errors='strict')[:2000]
+                        break
+                    except Exception:
+                        pass
+                break
+        if not raw_text:
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    raw_text = f.read(2000)
+            except Exception:
+                b = safe_read_bytes(file_path) if 'safe_read_bytes' in globals() else None
+                if b:
+                    raw_text = b[:8000].decode('utf-8', errors='ignore')[:2000]
+
+        if raw_text:
+            dialect = csv.excel
+            try:
+                sample_snippet = raw_text[:1024]
+                dialect = csv.Sniffer().sniff(sample_snippet)
+            except Exception:
+                pass
+            reader = csv.reader(io.StringIO(raw_text), dialect)
+            for row in reader:
+                if row:
+                    rows_data.append(row)
+                if len(rows_data) >= 26:
+                    break
+    except Exception:
+        pass
+
+    cols = ['A', 'B', 'C', 'D', 'E', 'F']
+    col_widths = []
+    for c_idx in range(6):
+        max_len = 10
+        for r in rows_data:
+            if c_idx < len(r) and r[c_idx]:
+                v_str = str(r[c_idx]).replace('\xa0', ' ').replace('\ufffd', '•').strip()
+                if len(v_str) > max_len:
+                    max_len = len(v_str)
+        col_widths.append(max(60, min(260, max_len * 7 + 16)))
+
+    draw.rectangle([0, 54, 600, 76], fill='#e6e6e6', outline='#d0d0d0')
+    draw.text((10, 58), "#", fill='#555555', font=font_bold)
+
+    x = 40
+    for i, col in enumerate(cols):
+        w = col_widths[i]
+        draw.rectangle([x, 54, x + w, 76], fill='#e6e6e6', outline='#c0c0c0')
+        draw.text((x + (w // 2) - 5, 58), col, fill='#333333', font=font_bold)
+        x += w
+
+    y = 76
+    row_h = 24
+    for row_idx in range(1, 26):
+        if y > 700:
+            break
+        draw.rectangle([0, y, 40, y + row_h], fill='#e6e6e6', outline='#c0c0c0')
+        draw.text((10, y + 4), str(row_idx), fill='#555555', font=font_regular)
+
+        row_vals = rows_data[row_idx - 1] if row_idx <= len(rows_data) else []
+
+        x = 40
+        for i in range(6):
+            w = col_widths[i]
+            val_str = ""
+            if i < len(row_vals) and row_vals[i] is not None:
+                val_str = str(row_vals[i]).replace('\xa0', ' ').replace('\ufffd', '•').strip()
+
+            is_header_row = (row_idx == 1)
+            fill_color = '#f8f9fa' if is_header_row else '#ffffff'
+            draw.rectangle([x, y, x + w, y + row_h], fill=fill_color, outline='#e0e0e0')
+            if val_str:
+                use_font = font_bold if is_header_row else font_regular
+                draw.text((x + 6, y + 4), val_str[:32], fill='#111111', font=use_font)
+            x += w
+        y += row_h
+
+    img.save(cache_path, 'JPEG', quality=95)
 
 
 def generate_fast_xlsx_cover(file_path, cache_path):
@@ -460,13 +580,14 @@ def process_single_thumbnail(src):
 
     try:
         if ftype == 'pdf':
-            doc = fitz.open(file_path)
-            if len(doc) > 0:
-                page = doc[0]
-                pix = page.get_pixmap(dpi=200)
-                pix.save(cache_path)
-                doc.close()
-                return 'generated'
+            with FITZ_LOCK:
+                doc = fitz.open(file_path)
+                if len(doc) > 0:
+                    page = doc[0]
+                    pix = page.get_pixmap(dpi=200)
+                    pix.save(cache_path)
+                    doc.close()
+            return 'generated'
         elif ftype in ('docx', 'doc'):
             generate_fast_docx_cover(file_path, cache_path)
             return 'generated'
@@ -476,7 +597,10 @@ def process_single_thumbnail(src):
         elif ftype in ('pptx', 'ppt'):
             generate_fast_pptx_cover(file_path, cache_path)
             return 'generated'
-        elif ftype in ('txt', 'md', 'csv', 'rtf'):
+        elif ftype in ('csv', 'tsv'):
+            generate_fast_csv_cover(file_path, cache_path)
+            return 'generated'
+        elif ftype in ('txt', 'md', 'rtf'):
             generate_fast_text_cover(file_path, cache_path, ftype)
             return 'generated'
     except Exception:

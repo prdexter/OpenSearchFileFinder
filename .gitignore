@@ -20,3 +20,18 @@ phi_scan_report.csv
 phi_scanner_progress.json
 phi_scanner_config.json
 sync_audit_report.txt
+
+# Machine-specific configuration and generated local reports
+/indexer_config.json
+/phi_scan_summary.json
+/overnight_maintenance_report.txt
+/no_phi_fields.txt
+/phi_out.txt
+/phi_err.txt
+*.lnk
+.env
+.env.*
+!.env.example
+.agents/
+.codex/
+.pytest_cache/
